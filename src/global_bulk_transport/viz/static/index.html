@@ -6,24 +6,26 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     html, body { height:100%; margin:0; font-family: ui-sans-serif, system-ui, sans-serif; color:#222 }
-    #wrap { display: grid; grid-template-columns: 280px 1fr; height:100vh; }
-    #side { padding: 16px; border-right: 1px solid #ddd; overflow-y:auto; background:#fafafa }
+    #wrap { display: grid; grid-template-columns: 320px 1fr; height:100vh; }
+    #side { padding: 18px 20px; border-right: 1px solid #ddd; overflow-y:auto; background:#fafafa }
     #map  { height: 100vh; }
-    h1 { font-size: 16px; margin: 0 0 8px 0 }
-    h2 { font-size: 13px; margin: 16px 0 6px 0; color:#555 }
+    h1 { font-size: 17px; margin: 0 0 8px 0; letter-spacing:-0.01em }
+    h2 { font-size: 11px; margin: 18px 0 6px 0; color:#666; text-transform: uppercase; letter-spacing:.05em }
     label { display:block; font-size:13px; margin: 6px 0 }
-    select, input[type=text] { width: 100%; padding: 4px; }
-    .legend { background: #fff; padding: 6px 8px; box-shadow: 0 1px 4px rgba(0,0,0,.2); font-size: 12px; line-height: 1.4 }
-    .legend i { display:inline-block; width:14px; height:14px; margin-right:6px; vertical-align:middle; opacity:.85 }
-    .src-marker { width: 14px; height: 14px; background: #d33; border:2px solid #fff; border-radius:50%; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
-    .small { font-size: 11px; color:#777; line-height:1.4 }
+    select, input[type=text] { width: 100%; padding: 6px 8px; font-size:13px; border:1px solid #ccc; border-radius:4px; background:#fff }
+    .legend { background: #fff; padding: 8px 10px; box-shadow: 0 1px 6px rgba(0,0,0,.15); font-size: 12px; line-height: 1.5; border-radius:4px }
+    .legend i { display:inline-block; width:16px; height:14px; margin-right:6px; vertical-align:middle; opacity:.85 }
+    .small { font-size: 11px; color:#777; line-height:1.5 }
+    .src-info { margin-top:8px; font-size:12px; padding:8px 10px; background:#fff; border:1px solid #eee; border-radius:4px }
+    .src-info b { color:#222 }
+    code { background:#eee; padding: 0 4px; border-radius:3px }
   </style>
 </head>
 <body>
 <div id="wrap">
   <div id="side">
     <h1>global bulk transport</h1>
-    <p class="small">Pick a source &amp; metric; map shades the per-destination value over the 0.5° cropland grid.</p>
+    <p class="small">Pick a source quarry &amp; metric. The map shades 0.5° destination cells by delivered transport cost / CO₂ / network distance — multimodal SSSP across road, rail, inland waterway and ocean shipping.</p>
 
     <h2>source</h2>
     <select id="source"></select>
@@ -35,63 +37,92 @@
       <option value="length_km">network distance (km)</option>
     </select>
 
-    <h2>info</h2>
-    <div id="info" class="small">—</div>
+    <div id="info" class="src-info">—</div>
+
+    <h2>about</h2>
+    <p class="small">All cost &amp; CO₂ assumptions are documented in <code>docs/methodology.md</code>. 2020–2024 USD reference. Demo build uses Natural Earth 10m + a hand-encoded inland waterway layer; see methodology §2 for limitations.</p>
   </div>
   <div id="map"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const map = L.map('map').setView([20, 0], 2);
+const map = L.map('map', { worldCopyJump: true }).setView([20, 0], 2);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  { attribution: '© OpenStreetMap contributors', maxZoom: 8 }).addTo(map);
+  { attribution: '© OpenStreetMap', maxZoom: 8, opacity: 0.55 }).addTo(map);
 
 const sourceSel = document.getElementById('source');
 const metricSel = document.getElementById('metric');
 const infoEl = document.getElementById('info');
 
-let cellsLayer = L.layerGroup().addTo(map);
-let sourceMarker = null;
+const cellsLayer = L.layerGroup().addTo(map);
+const sourcesLayer = L.layerGroup().addTo(map);
+let selectedSrc = null;
 let legend = null;
 
+const RAMP = ['#440154','#3b528b','#21918c','#5ec962','#fde725'];
 function color(v, breaks) {
-  // viridis-ish 5-step ramp
-  const ramp = ['#440154','#3b528b','#21918c','#5ec962','#fde725'];
-  for (let i = 0; i < breaks.length; ++i) if (v <= breaks[i]) return ramp[i];
-  return ramp[ramp.length - 1];
+  for (let i = 0; i < breaks.length; ++i) if (v <= breaks[i]) return RAMP[i];
+  return RAMP[RAMP.length - 1];
 }
 
-function renderLegend(metric, breaks) {
+function renderLegend(label, breaks) {
   if (legend) legend.remove();
   legend = L.control({position:'bottomright'});
   legend.onAdd = () => {
     const d = L.DomUtil.create('div','legend');
-    d.innerHTML = '<b>' + metric + '</b><br>';
-    const ramp = ['#440154','#3b528b','#21918c','#5ec962','#fde725'];
+    let html = '<b>' + label + '</b><br>';
     breaks.forEach((b, i) => {
-      d.innerHTML += '<i style="background:' + ramp[i] + '"></i>≤ ' + b.toLocaleString(undefined,{maximumSignificantDigits:3}) + '<br>';
+      const fmt = b.toLocaleString(undefined, { maximumSignificantDigits: 3 });
+      html += '<i style="background:' + RAMP[i] + '"></i> ≤ ' + fmt + '<br>';
     });
+    d.innerHTML = html;
     return d;
   };
   legend.addTo(map);
 }
 
+function metricLabel(m) {
+  if (m === 'cost_total') return 'USD per tonne';
+  if (m === 'co2_total')  return 'g CO₂ per tonne';
+  return 'km';
+}
+
+function fmtVal(v, m) {
+  if (m === 'co2_total') return (v/1000).toLocaleString(undefined, {maximumFractionDigits:1}) + ' kg/t';
+  if (m === 'cost_total') return '$' + v.toLocaleString(undefined, {maximumFractionDigits:2}) + '/t';
+  return v.toLocaleString(undefined, {maximumFractionDigits:0}) + ' km';
+}
+
 async function loadGrid() {
-  const sid = sourceSel.value, m = metricSel.value;
-  if (!sid) return;
+  if (!selectedSrc) return;
+  const m = metricSel.value;
   cellsLayer.clearLayers();
-  const r = await fetch(`/grid/${sid}?metric=${m}`);
+  const r = await fetch(`/grid/${selectedSrc.source_id}?metric=${m}`);
   if (!r.ok) { infoEl.textContent = 'error: ' + r.status; return; }
   const j = await r.json();
-  infoEl.innerHTML = `<b>${sid}</b><br>cells: ${j.n}<br>metric: ${j.metric}`;
+  infoEl.innerHTML =
+    '<b>' + selectedSrc.name + '</b><br>' +
+    '<span class="small">cells: ' + j.n.toLocaleString() + ' &middot; metric: ' + metricLabel(j.metric) + '</span>';
+  // Draw 0.5° cells as rectangles for proper heat-map look
+  const halfRes = 0.25;
   j.cells.forEach(c => {
-    L.circleMarker([c.lat, c.lon], {
-      radius: 3, weight: 0, fillOpacity: 0.65,
+    const bounds = [[c.lat - halfRes, c.lon - halfRes], [c.lat + halfRes, c.lon + halfRes]];
+    L.rectangle(bounds, {
+      color: '#000', weight: 0,
       fillColor: color(c.v, j.breaks),
-    }).bindTooltip(`${c.v.toLocaleString(undefined,{maximumSignificantDigits:4})}`).addTo(cellsLayer);
+      fillOpacity: 0.7,
+    }).bindTooltip(fmtVal(c.v, j.metric), { sticky: true }).addTo(cellsLayer);
   });
-  renderLegend(m, j.breaks);
+  renderLegend(metricLabel(j.metric), j.breaks);
+}
+
+function setSelected(s) {
+  selectedSrc = s;
+  sourceSel.value = s.source_id;
+  sourcesLayer.eachLayer(l => l.setStyle && l.setStyle({ fillColor: l._gbtSrc && l._gbtSrc.source_id === s.source_id ? '#d33' : '#888' }));
+  map.setView([s.lat, s.lon], Math.max(map.getZoom(), 4));
+  loadGrid();
 }
 
 async function init() {
@@ -101,23 +132,21 @@ async function init() {
     const o = document.createElement('option');
     o.value = s.source_id;
     o.textContent = `${s.name} (${s.source_id})`;
-    o.dataset.lon = s.lon; o.dataset.lat = s.lat;
     sourceSel.appendChild(o);
+    const m = L.circleMarker([s.lat, s.lon], {
+      radius: 7, color:'#222', weight:1,
+      fillColor: '#888', fillOpacity: 0.9,
+    }).bindTooltip(s.name);
+    m._gbtSrc = s;
+    m.on('click', () => setSelected(s));
+    sourcesLayer.addLayer(m);
   });
-  if (list.length) {
-    const s = list[0];
-    sourceMarker = L.marker([s.lat, s.lon], { title: s.name }).addTo(map);
-    sourceSel.value = s.source_id;
-    map.setView([s.lat, s.lon], 4);
-    loadGrid();
-  }
+  if (list.length) setSelected(list[0]);
 }
-sourceSel.addEventListener('change', () => {
-  const o = sourceSel.selectedOptions[0];
-  if (sourceMarker) sourceMarker.remove();
-  sourceMarker = L.marker([+o.dataset.lat, +o.dataset.lon]).addTo(map);
-  map.setView([+o.dataset.lat, +o.dataset.lon], 4);
-  loadGrid();
+sourceSel.addEventListener('change', async () => {
+  const all = await fetch('/sources').then(r => r.json());
+  const s = all.find(x => x.source_id === sourceSel.value);
+  if (s) setSelected(s);
 });
 metricSel.addEventListener('change', loadGrid);
 init();

@@ -29,6 +29,25 @@ Running the underlying Python modules directly is also fine — the
 Snakemake rules are thin wrappers. See `workflow/rules/*.smk` for the
 exact CLI invocations.
 
+## Demo output
+
+Routing one of the demo sources (Columbia River basalt) for delivered
+cost across the global 0.5° destination grid:
+
+![Columbia River basalt — delivered cost USD/t](results/figures/basalt_columbia_cost_total.png)
+
+Western North America has the cheapest delivery (continuous road/rail
+network and short Pacific-coast ocean access); West Africa and the
+Russian/Tibetan interior land in the most expensive bracket because they
+either have no rail loadout or require multi-leg road-only routing.
+
+Generate equivalents for any source:
+
+```bash
+pixi run figure --source basalt_iceland --metric co2_total
+pixi run figure --source dunite_oman    --metric length_km
+```
+
 After routing completes, the demo zarr store at `results/routes.zarr/`
 contains 8 demo source quarries (Iceland, Deccan, Columbia River, Skye,
 Paraná, Oman, NY wollastonite, Ethiopia) routed against ~27 000 0.5°

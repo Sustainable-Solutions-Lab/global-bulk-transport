@@ -18,6 +18,7 @@ data/processed/*
 !data/processed/.gitkeep
 results/*
 !results/.gitkeep
+!results/figures/
 
 # os
 .DS_Store

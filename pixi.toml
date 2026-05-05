@@ -7,12 +7,14 @@ channels = ["conda-forge", "bioconda"]
 platforms = ["linux-64"]
 
 [tasks]
-build-graph        = "snakemake --cores 4 build_graph"
-attach-attributes  = "snakemake --cores 4 attach_attributes"
-route              = "snakemake --cores 4 route"
-all                = "snakemake --cores 4 all"
+build-graph        = "snakemake -s workflow/Snakefile --cores 4 build_graph"
+weighted           = "snakemake -s workflow/Snakefile --cores 4 weighted"
+route              = "snakemake -s workflow/Snakefile --cores 4 route"
+all                = "snakemake -s workflow/Snakefile --cores 4 all"
 viz                = "python -m global_bulk_transport.viz.serve"
 test               = "pytest -q tests"
+graph-stats        = "python -m global_bulk_transport.network.stats"
+figure             = "python -m global_bulk_transport.viz.figure --source basalt_columbia --metric cost_total"
 
 [dependencies]
 python = ">=3.11,<3.13"

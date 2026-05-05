@@ -35,7 +35,7 @@ rule build_graph:
         PROC / "graph.pkl",
         PROC / "graph.gpkg",
 
-rule attach_attributes:
+rule weighted:
     input:
         PROC / "graph_weighted.pkl",
 
