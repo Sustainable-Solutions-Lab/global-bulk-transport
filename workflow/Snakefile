@@ -1,0 +1,44 @@
+"""
+Snakemake orchestration for the global bulk-transport pipeline.
+
+Mirrors Open-GIRA's per-mode rule structure: roads, rail, maritime each
+get their own .smk include; inland waterways come from a hand-encoded
+GeoJSON; a final merge rule produces the multimodal igraph + GeoPackage.
+"""
+
+from pathlib import Path
+import yaml
+
+configfile: "config/config.yaml"
+
+PROC = Path(config["paths"]["data_processed"])
+RES  = Path(config["paths"]["results"])
+
+include: "rules/road.smk"
+include: "rules/rail.smk"
+include: "rules/ports.smk"
+include: "rules/maritime.smk"
+include: "rules/inland.smk"
+include: "rules/transshipment.smk"
+include: "rules/graph.smk"
+include: "rules/attributes.smk"
+include: "rules/snapping.smk"
+include: "rules/routing.smk"
+
+rule all:
+    input:
+        RES / "routes.zarr" / ".zgroup",
+        PROC / "graph.gpkg",
+
+rule build_graph:
+    input:
+        PROC / "graph.pkl",
+        PROC / "graph.gpkg",
+
+rule attach_attributes:
+    input:
+        PROC / "graph_weighted.pkl",
+
+rule route:
+    input:
+        RES / "routes.zarr" / ".zgroup",

@@ -1,0 +1,147 @@
+# =====================================================================
+# Transport cost factors for bulk-mineral movement (USD per tonne-km)
+# Reference year: 2020–2024 USD. These rates are volatile; users should
+# update for inflation / fuel-price regime changes.
+# =====================================================================
+#
+# Citation codes (full bibliography in docs/methodology.md):
+#   VERSCHUUR_2025   : Verschuur et al. 2025 Zenodo deposit — country-
+#                      level road freight cost factors normalised against
+#                      World Bank LPI components; the primary basis for
+#                      our truck country adjustments.
+#   WB_LPI_2023      : World Bank Logistics Performance Index 2023.
+#   RENFORTH_2012    : Renforth (2012). Used a global 0.10 USD/tkm road
+#                      placeholder for ERW comminution-to-field; we narrow
+#                      with country LPI factors here.
+#   EUFRASIO_2022    : Eufrasio et al. (2022). Used $0.04/tkm rail bulk,
+#                      $0.005/tkm sea bulk for ERW-relevant logistics.
+#   ARGUS / DREWRY   : commercial bulk-rate intelligence — used as range
+#                      sanity checks (not redistributed; not stored here).
+#   USACE_BARGE_2022 : USACE Inland Waterway Navigation Value to the
+#                      Nation report 2022 — barge unit rates.
+#   IMO_GHG4         : IMO 4th GHG Study Annex 2 voyage-cost worksheets.
+#
+# All values are *line-haul only*. Per-handling costs at transshipment
+# nodes live in transshipment.yaml.
+# =====================================================================
+
+# --- DEFAULTS by mode -------------------------------------------------
+defaults:
+  road_truck_bulk:    0.075   # USD/tkm. Midpoint of $0.05–0.10 quoted in spec.
+                              # RENFORTH_2012 uses 0.10; VERSCHUUR_2025 OECD avg ~0.07.
+  rail_unit_train:    0.018   # midpoint of $0.01–0.03 (spec); EUFRASIO_2022 used 0.04
+                              # which we treat as a higher mixed-freight bound.
+  inland_barge:       0.0075  # midpoint $0.005–0.01. USACE_BARGE_2022 reports
+                              # ~$0.007/tkm for Mississippi grain barges.
+  sea_bulk_default:   0.0035  # midpoint $0.002–0.005.
+  sea_handysize:      0.005   # higher rate for short-sea/handysize.
+  sea_supramax:       0.0035
+  sea_panamax:        0.0028
+  sea_capesize:       0.0022
+
+# --- Country adjustment for ROAD ($USD/tkm, multiplier on default) ---
+# Derived from VERSCHUUR_2025 country road-cost ratios harmonised against
+# WB_LPI_2023. Where data missing, fall back to LPI tier:
+#   tier_high (LPI overall ≥ 3.5):  factor 0.95
+#   tier_mid  (LPI overall 2.7–3.5): factor 1.00
+#   tier_low  (LPI overall < 2.7):  factor 1.20
+road_country_factor:
+  default: 1.00
+  countries:
+    # OECD high-LPI
+    DE: 0.85
+    NL: 0.85
+    SE: 0.90
+    NO: 0.95
+    FR: 0.92
+    BE: 0.88
+    GB: 0.95
+    DK: 0.92
+    CH: 1.00
+    AT: 0.95
+    JP: 1.05
+    KR: 0.95
+    SG: 0.85
+    US: 0.95
+    CA: 1.00
+    AU: 1.10    # remote distances, higher fuel
+    NZ: 1.10
+    # large emerging
+    CN: 0.90
+    IN: 0.85    # cheap diesel + labour, despite logistics frictions
+    BR: 1.05
+    RU: 1.05
+    ZA: 1.05
+    MX: 1.00
+    AR: 1.10
+    TR: 0.95
+    ID: 1.05
+    VN: 0.90
+    TH: 0.90
+    MY: 0.90
+    PH: 1.10
+    EG: 1.00
+    NG: 1.40
+    KE: 1.30
+    TZ: 1.35
+    ET: 1.40
+    PK: 1.10
+    BD: 1.10
+    UA: 1.05
+    PL: 0.92
+    CZ: 0.92
+    RO: 1.00
+
+# --- Country adjustment for RAIL (multiplier) ------------------------
+# Rail markets are more concentrated; OECD bulk rail much cheaper than
+# emerging-market mixed-freight rail. EUFRASIO_2022 + Drewry rail bulk
+# spreads.
+rail_country_factor:
+  default: 1.00
+  countries:
+    US: 0.65       # Class-I unit-train coal/grain rates ~$0.012/tkm
+    CA: 0.70
+    AU: 0.75       # Pilbara iron ore rail <$0.01/tkm; conservative here
+    BR: 0.80       # Carajás/Vitoria-Minas
+    RU: 0.75       # rail-heavy bulk economy
+    CN: 0.70       # heavy-haul lines
+    IN: 1.10
+    DE: 1.10
+    FR: 1.20
+    NL: 1.15
+    GB: 1.30
+    PL: 1.05
+    ZA: 0.90
+    UA: 0.95
+    KZ: 0.85
+
+# --- Country adjustment for INLAND BARGE (multiplier) ----------------
+# Few markets dominate. Mississippi system most efficient.
+barge_country_factor:
+  default: 1.00
+  countries:
+    US: 0.85      # Mississippi-Ohio system
+    CN: 0.85      # Yangtze
+    NL: 1.00
+    DE: 1.05
+    BE: 1.00
+    FR: 1.10
+    RU: 1.05
+    UA: 1.05
+    BR: 1.20      # Paraná-Paraguay less mature
+    PY: 1.20
+    AR: 1.15
+    EG: 1.20
+    BD: 1.30      # Brahmaputra/Meghna informal sector
+
+# --- Notes -----------------------------------------------------------
+# 1. Where Verschuur 2025 publishes a USD/tkm number directly, it is used
+#    in preference to the multiplier above; see attributes/cost.py for
+#    the resolution logic.
+# 2. Sea costs are NOT country-tagged — they are per-route based on
+#    distance-derived vessel class. Port dues / pilotage are folded into
+#    transshipment.yaml port-handling cost.
+# 3. The 2020–2024 reference window covers the post-COVID supply-shock
+#    spike for ocean dry-bulk rates (BDI peaked 2021/2022). Current rates
+#    have softened; users adjusting for newer time periods should scale
+#    sea_bulk_default by current BDI / 2020-2024-avg-BDI ≈ 1.0.

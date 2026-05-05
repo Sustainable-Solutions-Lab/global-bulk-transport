@@ -1,0 +1,114 @@
+# =====================================================================
+# CO2 emission factors for bulk-mineral transport (g CO2 per tonne-km)
+# =====================================================================
+# All values are well-to-wheel (WTW) where possible; otherwise tank-to-
+# wheel (TTW) noted. Sources are cited here once and referenced by short
+# code in the methodology document.
+#
+# Citation codes:
+#   ECOTRANSIT_2024  : Knörr et al., EcoTransIT World Methodology v9
+#                      (https://www.ecotransit.org)
+#   IMO_GHG4         : IMO Fourth Greenhouse Gas Study 2020
+#   IEA_TR_2023      : IEA Tracking Transport / IEA Mobility Model 2023
+#   IEA_GRID_2023    : IEA Electricity, country grid CO2 intensities 2023
+#   PIANC_2019       : PIANC Working Group 156, Greenhouse-gas emissions
+#                      of inland navigation, 2019
+#   USACE_WCSC       : US Army Corps of Engineers Waterborne Commerce
+#                      Statistics Center fuel-burn factors
+#   RENFORTH_2012    : Renforth, P. (2012) IJGGC 10:229–243
+#   EUFRASIO_2022    : Eufrasio et al. (2022) Communications Earth & Env. 3:1–11
+#   VERSCHUUR_2025   : Verschuur et al. (2025) Zenodo dataset 14XXXXXX
+#                      (country road cost factors; CO2 mostly indirect)
+#
+# Units: grams of CO2 (or CO2-equivalent including upstream where flagged)
+# per tonne-kilometre of cargo carried.
+# =====================================================================
+
+# --- DEFAULTS by mode (used when no country-specific value applies) ---
+defaults:
+  road_truck_bulk:        70    # g CO2/tkm. Heavy bulk truck, ~25 t payload, EURO V/VI mix.
+                                 # Source: ECOTRANSIT_2024 §6.2 (heavy truck >20 t bulk),
+                                 # cross-check IEA_TR_2023 ~60–80.
+  rail_diesel:            28    # ECOTRANSIT_2024 freight diesel rail global avg.
+  rail_electric:          18    # World-average electric freight rail; varies wildly with grid.
+                                 # Per-country override below uses IEA_GRID_2023 mix × ~0.025 kWh/tkm.
+  inland_barge:           32    # Global avg over CEMT II–VI; PIANC_2019 fig.4 weighted.
+  inland_barge_class_I:   45    # Small barge <300 t (CEMT I): poorer load factor.
+  inland_barge_class_IV:  31    # ~1000–1500 t (CEMT IV).
+  inland_barge_class_VI:  24    # Push convoys 3000+ t (CEMT VIa+).
+  sea_handysize:          10    # 10000–35000 dwt short-sea/handysize loaded.
+                                 # IMO_GHG4 + ECOTRANSIT_2024 short-sea bulk.
+  sea_supramax:            6    # 35000–60000 dwt.
+  sea_panamax:             4    # 60000–80000 dwt.
+  sea_capesize:            3    # 80000+ dwt.
+  sea_default:             5    # used unless port-pair distance triggers vessel-class logic.
+
+# --- Country grid factors for ELECTRIC RAIL (g CO2 per kWh) ---
+# Used as: co2_per_tkm = grid_g_per_kwh * energy_intensity_kwh_per_tkm
+# energy intensity assumed 0.025 kWh/tkm (ECOTRANSIT_2024 freight rail electric).
+# Selected major rail-freight countries; fall back to defaults.rail_electric otherwise.
+# Source: IEA_GRID_2023.
+electric_rail_grid_g_per_kwh:
+  energy_intensity_kwh_per_tkm: 0.025
+  countries:
+    SE: 14    # Sweden — hydro/nuclear dominant
+    NO: 30
+    FR: 56
+    CH: 47
+    BR: 113   # large hydro share
+    CA: 130
+    DE: 380
+    ES: 190
+    IT: 270
+    GB: 230
+    NL: 350
+    BE: 170
+    AT: 110
+    JP: 470
+    KR: 440
+    CN: 580   # China grid average — drives the ~25 g/tkm electric rail value cited in spec
+    IN: 620
+    RU: 380
+    US: 380
+    AU: 510
+    PL: 660
+    ZA: 870
+    TR: 440
+    UA: 320
+
+# --- Country handling adjustments for ROAD trucks ---
+# Multiplicative factor on defaults.road_truck_bulk to account for fleet age,
+# fuel quality and load-factor differences. Conservative ranges from
+# ECOTRANSIT_2024 regional appendices and IEA_TR_2023 emerging-market work.
+road_country_factor:
+  default: 1.00
+  countries:
+    DE: 0.95
+    FR: 0.95
+    NL: 0.95
+    SE: 0.92
+    NO: 0.92
+    GB: 0.97
+    US: 1.05      # heavier average truck, lower load-factor fleet mix
+    CA: 1.05
+    AU: 1.05
+    CN: 1.10
+    IN: 1.25      # older fleet, lower-quality fuel
+    RU: 1.20
+    BR: 1.15
+    AR: 1.15
+    ZA: 1.15
+    NG: 1.30
+    ID: 1.20
+    PK: 1.30
+    BD: 1.30
+
+# --- Notes ---
+# 1. Per-tkm factors are LOADED only. Empty backhaul is implicitly priced
+#    into bulk-rate cost factors (cost.yaml) but is NOT added here because
+#    EcoTransIT methodology already includes a fleet-average load factor.
+# 2. For sea legs, vessel class is selected dynamically based on port-pair
+#    deep-water status and great-circle distance (see attributes/sea.py),
+#    not stored statically in this file.
+# 3. Inland barge class is read from the encoded waterway segment's CEMT
+#    (or equivalent) class — see config/inland_waterways.geojson properties.

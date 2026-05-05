@@ -1,0 +1,64 @@
+# =====================================================================
+# Transshipment (handling) cost & CO2 per tonne. Applied as the weight
+# of the zero-length edge that connects two different modes at a port,
+# rail-yard or river port.
+# =====================================================================
+# Spec range: $1–3/t handling; ~5–10 kg CO2/t per transshipment.
+# We pick midpoints by transshipment type and let cost vary by country
+# wage proxy through World Bank LPI logistics-quality component.
+#
+# Sources:
+#   ECOTRANSIT_2024 §10  — transshipment energy intensities for bulk dry.
+#   PIANC_2008_BS       — PIANC Bulk Solids handling at inland terminals.
+#   UNCTAD_PORT_2022    — port handling cost benchmarks.
+#   IEA_TR_2023         — port equipment electrification scenarios.
+# =====================================================================
+
+# Cost (USD per tonne handled) — applied at every transshipment edge.
+cost_usd_per_t:
+  port_sea:           2.50    # ship-loader / shore-crane on bulk carriers
+  port_inland:        1.80    # river-port bulk handling
+  rail_yard:          1.20    # tippler / front-end-loader rail-truck transfer
+  road_to_rail:       1.20
+  road_to_inland:     1.50
+  road_to_sea:        2.00    # truck-to-ship via stockpile
+  rail_to_sea:        1.80
+  rail_to_inland:     1.50
+  inland_to_sea:      2.20    # river-sea barge transfer (often via stockpile)
+
+# CO2 (kg per tonne handled).
+co2_kg_per_t:
+  port_sea:           7.5
+  port_inland:        5.5
+  rail_yard:          3.5
+  road_to_rail:       3.5
+  road_to_inland:     4.0
+  road_to_sea:        6.0
+  rail_to_sea:        5.5
+  rail_to_inland:     4.5
+  inland_to_sea:      6.5
+
+# Country multiplier on cost (CO2 not adjusted — handling-equipment fuel
+# mix dominates and is similar globally).
+country_factor:
+  default: 1.00
+  countries:
+    US: 0.95
+    CA: 0.95
+    DE: 1.05
+    NL: 0.95     # Rotterdam/Amsterdam — efficient bulk handling
+    BE: 0.95
+    GB: 1.10
+    FR: 1.10
+    JP: 1.15
+    KR: 1.05
+    SG: 0.95
+    CN: 0.85
+    IN: 0.75
+    BR: 1.05
+    RU: 0.95
+    AU: 1.00
+    ZA: 1.00
+    NG: 1.40
+    ID: 0.90
+    AR: 1.10

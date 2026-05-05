@@ -1,0 +1,27 @@
+# pixi
+.pixi/
+*.lock
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# data
+data/raw/*
+!data/raw/.gitkeep
+data/interim/*
+!data/interim/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+results/*
+!results/.gitkeep
+
+# os
+.DS_Store
+
+# editor
+.vscode/
+.idea/

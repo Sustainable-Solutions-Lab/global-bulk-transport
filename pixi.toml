@@ -1,0 +1,51 @@
+[workspace]
+name = "global-bulk-transport"
+version = "0.1.0"
+description = "Global multimodal bulk-transport graph with cost & CO2 attribution for ERW research"
+authors = ["Koen <koenvg@posteo.net>"]
+channels = ["conda-forge", "bioconda"]
+platforms = ["linux-64"]
+
+[tasks]
+build-graph        = "snakemake --cores 4 build_graph"
+attach-attributes  = "snakemake --cores 4 attach_attributes"
+route              = "snakemake --cores 4 route"
+all                = "snakemake --cores 4 all"
+viz                = "python -m global_bulk_transport.viz.serve"
+test               = "pytest -q tests"
+
+[dependencies]
+python = ">=3.11,<3.13"
+geopandas = ">=0.14"
+shapely = ">=2"
+pyproj = ">=3.6"
+rtree = ">=1.1"
+fiona = "*"
+pyogrio = ">=0.9"
+rasterio = ">=1.3"
+xarray = ">=2024.1"
+zarr = ">=2.17,<3"
+netcdf4 = "*"
+numpy = ">=1.26"
+pandas = ">=2.1"
+scipy = ">=1.11"
+python-igraph = ">=0.11"
+networkx = ">=3.2"
+snakemake-minimal = ">=7.32,<10"
+pyyaml = ">=6"
+pyarrow = ">=15"
+fastapi = ">=0.110"
+uvicorn = ">=0.29"
+jinja2 = ">=3.1"
+matplotlib = ">=3.8"
+contextily = ">=1.5"
+tqdm = ">=4.66"
+requests = ">=2.31"
+pytest = ">=8"
+ruff = ">=0.4"
+pip = "*"
+
+[pypi-dependencies]
+snkit = "*"
+searoute = "*"
+global-bulk-transport = { path = ".", editable = true }

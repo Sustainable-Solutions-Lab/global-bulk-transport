@@ -1,0 +1,9 @@
+source_id,name,lon,lat,mode_preference,notes
+basalt_iceland,"Iceland (basalt - hypothetical quarry)",-21.5,64.10,road,Demo source for Iceland basalt
+basalt_deccan,"India Deccan Traps (Pune area)",73.85,18.52,road,Demo Indian basalt source
+basalt_columbia,"USA Columbia River basalt",-118.30,46.10,rail,Demo PNW basalt source with rail loadout
+basalt_skye,"Scotland Skye basalt",-6.27,57.27,road,Demo Scottish basalt
+basalt_parana,"Brazil Paraná basalt",-49.50,-25.20,rail,Demo Brazilian basalt with rail
+dunite_oman,"Oman ophiolite (Sumail)",58.0,23.0,road,Demo dunite source (Oman ophiolite)
+wollastonite_willsboro,"USA NY wollastonite",-73.40,44.32,road,Demo wollastonite quarry
+basalt_ethiopia,"Ethiopia Highlands (near Addis)",38.78,9.03,road,Demo Ethiopian basalt

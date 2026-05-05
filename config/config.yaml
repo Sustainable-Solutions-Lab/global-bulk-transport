@@ -1,0 +1,47 @@
+# Global config — paths and run parameters.
+# All numerical assumptions (cost/CO2/handling) live in their own files
+# (cost.yaml, co2.yaml, transshipment.yaml) so this file stays purely about
+# orchestration.
+
+paths:
+  data_raw: data/raw
+  data_interim: data/interim
+  data_processed: data/processed
+  results: results
+
+# Source CRS used internally. Lengths are computed in metres after
+# reprojecting to a local equal-area or via the geodesic on the WGS84
+# ellipsoid; see src/global_bulk_transport/network/geometry.py.
+crs:
+  storage: "EPSG:4326"
+
+# Snapping radii (km) when finding the nearest network node for an
+# arbitrary lon/lat. Mode-specific because rail/water terminals are sparse.
+snap_radius_km:
+  road: 50
+  rail: 100
+  inland_waterway: 50
+  maritime: 100   # for snapping a coastal source to a port
+
+# Destination grid for routing outputs.
+destination_grid:
+  resolution_deg: 0.5
+  cropland_threshold: 0.05  # ESA WorldCover cropland fraction min
+
+# Transshipment connection radii (km): when wiring a port or river-port to
+# the road / rail network, snap it to nodes within this distance.
+transshipment_link_radius_km:
+  port_to_road: 75
+  port_to_rail: 50
+  river_to_road: 50
+  river_to_rail: 50
+  rail_to_road: 10
+
+# Routing
+routing:
+  metrics: ["length_km", "cost_total", "co2_total"]
+
+# Visualization
+viz:
+  host: "127.0.0.1"
+  port: 8000
