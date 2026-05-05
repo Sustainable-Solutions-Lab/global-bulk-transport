@@ -73,6 +73,15 @@ def test_built_graph_has_all_modes():
     assert (cost >= 0).all() and (co2 >= 0).all()
 
 
+@pytest.mark.skipif(not (PROC / "graph_weighted.pkl").exists(), reason="build not run")
+def test_query_cli_returns_results():
+    from global_bulk_transport.routing.query import query
+    df = query(-118.3, 46.1, "cost_total", "road", top=5)
+    assert len(df) == 5
+    assert (df["value"].diff().dropna() >= 0).all()  # sorted ascending
+    assert df["value"].iloc[0] >= 0
+
+
 @pytest.mark.skipif(not (RES / "routes.zarr").exists(), reason="routing not run")
 def test_routes_metrics_diverge():
     """Length-, cost- and CO2-optimal routes are not perfectly collinear."""

@@ -54,6 +54,18 @@ Paraná, Oman, NY wollastonite, Ethiopia) routed against ~27 000 0.5°
 land cells — replace `config/sources_demo.csv` with your own quarries
 and re-run.
 
+### Ad-hoc queries
+
+For an arbitrary lon/lat without rebuilding the zarr store:
+
+```bash
+pixi run query -- --lon -118.3 --lat 46.1 --metric cost_total --top 10
+pixi run query -- --lon  38.78 --lat  9.03 --metric co2_total --mode road
+```
+
+Returns the top-N cheapest destinations from that source as a small
+table, using the already-built weighted graph and snapped destinations.
+
 ## What's in here
 
 | Path | Purpose |

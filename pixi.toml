@@ -15,6 +15,7 @@ viz                = "python -m global_bulk_transport.viz.serve"
 test               = "pytest -q tests"
 graph-stats        = "python -m global_bulk_transport.network.stats"
 figure             = "python -m global_bulk_transport.viz.figure --source basalt_columbia --metric cost_total"
+query              = "python -m global_bulk_transport.routing.query"
 
 [dependencies]
 python = ">=3.11,<3.13"
