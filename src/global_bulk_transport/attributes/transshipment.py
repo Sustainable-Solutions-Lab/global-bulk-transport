@@ -22,10 +22,23 @@ def _canonical(kind: str) -> str:
 
 
 def handling(kind: str, iso: str | None) -> tuple[float, float]:
-    """Return (cost_usd_per_t, co2_kg_per_t) for a transshipment kind."""
+    """Return (cost_usd_per_t, co2_kg_per_t) for a transshipment kind.
+
+    Country factor resolution mirrors lookup._country_factor:
+    yaml override -> LPI-derived `handling_cost_factor` -> default.
+    """
     cfg = transshipment_config()
     k = _canonical(kind)
     cost = cfg["cost_usd_per_t"][k]
     co2  = cfg["co2_kg_per_t"][k]
-    factor = cfg["country_factor"]["countries"].get(iso, cfg["country_factor"]["default"])
-    return float(cost) * float(factor), float(co2)
+    table = cfg["country_factor"]
+    if iso is not None and iso in table["countries"]:
+        factor = float(table["countries"][iso])
+    else:
+        from global_bulk_transport.attributes.lookup import _lpi_table
+        lpi = _lpi_table()
+        if lpi is not None and iso is not None and iso in lpi.index:
+            factor = float(lpi.loc[iso, "handling_cost_factor"])
+        else:
+            factor = float(table["default"])
+    return float(cost) * factor, float(co2)

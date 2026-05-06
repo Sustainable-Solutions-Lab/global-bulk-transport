@@ -74,6 +74,30 @@ def test_built_graph_has_all_modes():
 
 
 @pytest.mark.skipif(not (PROC / "graph_weighted.pkl").exists(), reason="build not run")
+def test_pittsburgh_new_orleans_uses_barge():
+    """Pittsburgh -> New Orleans should route mostly on Ohio + Mississippi
+    inland waterway, not all road. Confirms multimodal SSSP exercises barge."""
+    from global_bulk_transport.routing.inspect import inspect_path
+    out = inspect_path(-80.0, 40.44, -90.10, 29.95, metric="cost_total",
+                       src_mode="inland_waterway")
+    by_mode = {row["mode"]: row for row in out["by_mode"]}
+    assert "inland_waterway" in by_mode
+    iw_km = by_mode["inland_waterway"]["length_km"]
+    assert iw_km > 800, f"barge leg only {iw_km:.0f} km; expected >800"
+
+
+@pytest.mark.skipif(not (PROC / "graph_weighted.pkl").exists(), reason="build not run")
+def test_iceland_rotterdam_uses_ship():
+    """Iceland -> Rotterdam should be dominated by maritime."""
+    from global_bulk_transport.routing.inspect import inspect_path
+    out = inspect_path(-21.5, 64.10, 4.40, 51.92, metric="cost_total",
+                       src_mode="road", dst_mode="port")
+    by_mode = {row["mode"]: row for row in out["by_mode"]}
+    assert "maritime" in by_mode
+    assert by_mode["maritime"]["length_km"] > 1500
+
+
+@pytest.mark.skipif(not (PROC / "graph_weighted.pkl").exists(), reason="build not run")
 def test_query_cli_returns_results():
     from global_bulk_transport.routing.query import query
     df = query(-118.3, 46.1, "cost_total", "road", top=5)

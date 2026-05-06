@@ -1,6 +1,7 @@
 """Cropland-filtered destination grid + cached snapping."""
 
 rule build_dest_grid:
+    input:  "data/raw/cropland_05deg.tif"
     output: PROC / "dest_cells.parquet"
     shell:
         "python -m global_bulk_transport.snapping.dest_grid --out {output}"

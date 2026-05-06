@@ -34,17 +34,18 @@ def _grid_centres(res: float) -> pd.DataFrame:
 
 def _cropland_from_raster(raster_path: Path, lons: np.ndarray, lats: np.ndarray) -> np.ndarray:
     import rasterio
-
     with rasterio.open(raster_path) as src:
-        rows, cols = src.index(lons, lats)
-        rows = np.array(rows); cols = np.array(cols)
-        valid = (
-            (rows >= 0) & (rows < src.height) & (cols >= 0) & (cols < src.width)
-        )
-        out = np.full(len(lons), np.nan)
-        if valid.any():
-            band = src.read(1)
-            out[valid] = band[rows[valid], cols[valid]].astype(float)
+        band = src.read(1)
+        out = np.full(len(lons), np.nan, dtype=float)
+        # rasterio.index in vectorised mode is fragile across versions; do it by hand.
+        inv = ~src.transform
+        for i, (x, y) in enumerate(zip(lons, lats, strict=False)):
+            col_f, row_f = inv * (x, y)
+            row, col = int(row_f), int(col_f)
+            if 0 <= row < band.shape[0] and 0 <= col < band.shape[1]:
+                v = band[row, col]
+                if np.isfinite(v):
+                    out[i] = float(v)
         return out
 
 
