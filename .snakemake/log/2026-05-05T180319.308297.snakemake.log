@@ -1,0 +1,38 @@
+Assuming unrestricted shared filesystem usage.
+host: koen-stanford-laptop
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 4
+Rules claiming more threads will be scaled down.
+Job stats:
+job                    count
+-------------------  -------
+build_inland               1
+fetch_ports                1
+fetch_rail                 1
+fetch_road                 1
+unzip_cropland             1
+aggregate_cropland         1
+build_maritime             1
+fetch_rail_nodes           1
+fetch_road_nodes           1
+build_dest_grid            1
+build_transshipment        1
+stitch_road                1
+assemble_graph             1
+attach_attributes          1
+snap_destinations          1
+route_sources              1
+all                        1
+total                     17
+
+Select jobs to execute...
+Execute 4 jobs...
+[Tue May  5 18:03:19 2026]
+localrule fetch_road:
+    output: data/processed/road/edges.gpkg
+    jobid: 4
+    reason: Missing output files: data/processed/road/edges.gpkg
+    resources: tmpdir=/tmp
+WorkflowError:
+Error running conda info. Is conda installed and accessible? Error: Command 'conda info --json' returned non-zero exit status 127.

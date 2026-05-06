@@ -66,14 +66,38 @@ This is the same operation snkit's `add_endpoints_within` /
 `split_at_intersections` would do. We keep it as an explicit small
 step here so the densification is auditable.
 
-### 2.1.2 Maritime endpoint snapping
+### 2.1.2 Maritime endpoint snapping and sanity checks
 
 The ``searoute`` library returns sea routes whose start/end coords
 are sea-graph nodes a few km off the actual port lon/lat. We
 explicitly overwrite the LineString endpoints with the port's exact
 coords so port-node identity (``port_<lon>_<lat>``) is preserved when
-the multimodal graph is assembled — without this, every Atlantic
-crossing port falls into a different component.
+the multimodal graph is assembled — without this, every Atlantic-crossing
+port falls into a different component.
+
+We also reject searoute outputs whose returned distance is < 90 % of the
+great-circle distance, or whose first waypoint is > 100 km from the
+requested origin. NE 10m ports include some inland river ports
+(Wuhan-on-Yangtze, Pittsburgh-on-Ohio) for which searoute returns
+nonsensical 60–70 km paths that don't even start at the requested
+origin; rejecting these restores topological correctness. When searoute
+fails outright (e.g. between a Great Lakes port and a Gulf-of-Mexico
+port that share no sea route) we deliberately do *not* fall back to a
+great-circle edge — that would introduce phantom shortcuts. Multi-hop
+SSSP routes through intermediate ports that searoute does support.
+
+### 2.1.3 Maritime hub-and-spoke connectivity
+
+Each port connects to its 20 nearest neighbours, plus to its 2 nearest
+ports from a fixed list of 20 global hub ports (Rotterdam, Singapore,
+Shanghai, Houston, Hampton Roads, Long Beach, Tubarão, Cape Town,
+Yokohama, Sydney, Mumbai, Hamburg, New Orleans, Vancouver, Dakar,
+Buenos Aires, Suez Canal-N, Panama Canal-N, Reykjavík, Auckland). The
+hubs form a complete subgraph among themselves. This pattern keeps the
+maritime edge count manageable (~10 000 edges over 1 081 ports) while
+guaranteeing realistic trans-ocean direct edges. Without it, a 20-NN-
+only scheme produced spurious "Aleutians stepping-stone" routings for
+trans-Pacific traffic.
 
 ### 2.2 Country tagging and length
 
@@ -151,6 +175,25 @@ multiplier, conservative ranges from EcoTransIT regional appendices
 (e.g. India 1.25, China 1.10, USA 1.05, Germany 0.95). For new
 country-mode pairs the default applies.
 
+Country adjustment for **cost** has two sources. Hand-set values in
+``cost.yaml`` apply for ~20 countries where domain knowledge gives a
+firmer number than a generic logistics index (Germany, the US, Brazil,
+Russia, Australia, China, India and others). For the remaining
+~135 countries with WB LPI 2023+2018 data, ``network/fetch_lpi.py``
+pulls the LPI infrastructure component from the World Bank API and
+derives a transparent monotonic factor
+
+```
+factor = clip(2.5 / lpi_infrastructure, 0.70, 1.60)
+```
+
+This puts an LPI = 4.1 country (UAE, Belgium, Australia) at factor 0.70
+and an LPI = 1.7 country (Afghanistan, Libya) at 1.47. The mapping
+choice is documented in ``network/fetch_lpi.py`` so users can substitute
+the Verschuur 2025 country road-cost-per-km table directly when they
+obtain it. The two sources are reconciled in
+``attributes/lookup.py``: yaml override → LPI-derived → default.
+
 Inland barge factor varies by encoded CEMT class (small barges have
 worse fuel-per-tkm).
 
@@ -200,11 +243,14 @@ within the mode-specific radius set in `config.yaml`. Spatial query
 uses an `rtree` over node geometries.
 
 Destination grid is 0.5° world cells filtered to those with cropland
-fraction ≥ 5% from ESA WorldCover 2021 aggregated to 0.5° (or, if
-WorldCover not provided, a fallback uses the bundled MODIS/SPAM
-aggregation in `data/raw/cropland_05deg.tif`). This typically reduces
-~64,000 land cells to ~30,000–40,000 destinations. Snapped-destination
-node IDs are cached in `data/processed/dest_snapped.parquet`.
+fraction ≥ 5% from the Ramankutty et al. (2008) M3-Cropland 2000
+product, downloaded from the EarthStat archive at
+``https://storage.googleapis.com/earthstat/CroplandPastureArea2000_Geotiff.zip``
+and aggregated to 0.5° via ``snapping/cropland_aggregate.py``.
+That brings the global 86 000 land cells down to ~20 000 cropland
+cells, of which 16 023 also snap to a road node within 50 km — these
+are the routing destinations. Snapped-destination node IDs are
+cached in `data/processed/dest_snapped.parquet`.
 
 ## 5. Routing (Phase 4)
 

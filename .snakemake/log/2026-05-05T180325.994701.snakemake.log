@@ -1,0 +1,222 @@
+Assuming unrestricted shared filesystem usage.
+host: koen-stanford-laptop
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 4
+Rules claiming more threads will be scaled down.
+Job stats:
+job                    count
+-------------------  -------
+build_inland               1
+fetch_ports                1
+fetch_rail                 1
+fetch_road                 1
+unzip_cropland             1
+aggregate_cropland         1
+build_maritime             1
+fetch_rail_nodes           1
+fetch_road_nodes           1
+build_dest_grid            1
+build_transshipment        1
+stitch_road                1
+assemble_graph             1
+attach_attributes          1
+snap_destinations          1
+route_sources              1
+all                        1
+total                     17
+
+Select jobs to execute...
+Execute 4 jobs...
+[Tue May  5 18:03:26 2026]
+localrule fetch_road:
+    output: data/processed/road/edges.gpkg
+    jobid: 4
+    reason: Missing output files: data/processed/road/edges.gpkg
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:26 2026]
+localrule unzip_cropland:
+    input: data/raw/earthstat/CroplandPastureArea2000_Geotiff.zip
+    output: data/raw/earthstat/CroplandPastureArea2000_Geotiff/Cropland2000_5m.tif
+    jobid: 17
+    reason: Updated input files: data/raw/earthstat/CroplandPastureArea2000_Geotiff.zip
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:26 2026]
+localrule build_inland:
+    input: config/inland_waterways.geojson
+    output: data/processed/inland/edges.gpkg, data/processed/inland/nodes.gpkg
+    jobid: 10
+    reason: Missing output files: data/processed/inland/nodes.gpkg, data/processed/inland/edges.gpkg
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:26 2026]
+localrule fetch_rail:
+    output: data/processed/rail/edges.gpkg
+    jobid: 7
+    reason: Missing output files: data/processed/rail/edges.gpkg
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:26 2026]
+Finished jobid: 17 (Rule: unzip_cropland)
+1 of 17 steps (6%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue May  5 18:03:26 2026]
+localrule fetch_ports:
+    output: data/processed/ports/nodes.gpkg
+    jobid: 9
+    reason: Missing output files: data/processed/ports/nodes.gpkg
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:26 2026]
+Finished jobid: 10 (Rule: build_inland)
+2 of 17 steps (12%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue May  5 18:03:26 2026]
+localrule aggregate_cropland:
+    input: data/raw/earthstat/CroplandPastureArea2000_Geotiff/Cropland2000_5m.tif
+    output: data/raw/cropland_05deg.tif
+    jobid: 16
+    reason: Input files updated by another job: data/raw/earthstat/CroplandPastureArea2000_Geotiff/Cropland2000_5m.tif
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:26 2026]
+Finished jobid: 16 (Rule: aggregate_cropland)
+3 of 17 steps (18%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue May  5 18:03:26 2026]
+localrule build_dest_grid:
+    input: data/raw/cropland_05deg.tif
+    output: data/processed/dest_cells.parquet
+    jobid: 15
+    reason: Missing output files: data/processed/dest_cells.parquet; Input files updated by another job: data/raw/cropland_05deg.tif
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:26 2026]
+Finished jobid: 9 (Rule: fetch_ports)
+4 of 17 steps (24%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue May  5 18:03:26 2026]
+localrule build_maritime:
+    input: data/processed/ports/nodes.gpkg
+    output: data/processed/maritime/edges.gpkg
+    jobid: 8
+    reason: Missing output files: data/processed/maritime/edges.gpkg; Input files updated by another job: data/processed/ports/nodes.gpkg
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:28 2026]
+Finished jobid: 7 (Rule: fetch_rail)
+5 of 17 steps (29%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue May  5 18:03:28 2026]
+localrule fetch_rail_nodes:
+    input: data/processed/rail/edges.gpkg
+    output: data/processed/rail/nodes.gpkg
+    jobid: 12
+    reason: Missing output files: data/processed/rail/nodes.gpkg; Input files updated by another job: data/processed/rail/edges.gpkg
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:28 2026]
+Finished jobid: 15 (Rule: build_dest_grid)
+6 of 17 steps (35%) done
+[Tue May  5 18:03:28 2026]
+Finished jobid: 4 (Rule: fetch_road)
+7 of 17 steps (41%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue May  5 18:03:28 2026]
+localrule fetch_road_nodes:
+    input: data/processed/road/edges.gpkg
+    output: data/processed/road/nodes.gpkg
+    jobid: 6
+    reason: Missing output files: data/processed/road/nodes.gpkg; Input files updated by another job: data/processed/road/edges.gpkg
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:29 2026]
+Finished jobid: 12 (Rule: fetch_rail_nodes)
+8 of 17 steps (47%) done
+[Tue May  5 18:03:30 2026]
+Finished jobid: 6 (Rule: fetch_road_nodes)
+9 of 17 steps (53%) done
+Select jobs to execute...
+Execute 2 jobs...
+[Tue May  5 18:03:30 2026]
+localrule stitch_road:
+    input: data/processed/road/edges.gpkg, data/processed/road/nodes.gpkg
+    output: data/processed/road/stitch.gpkg
+    jobid: 5
+    reason: Missing output files: data/processed/road/stitch.gpkg; Input files updated by another job: data/processed/road/edges.gpkg, data/processed/road/nodes.gpkg
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:30 2026]
+localrule build_transshipment:
+    input: data/processed/road/nodes.gpkg, data/processed/rail/nodes.gpkg, data/processed/ports/nodes.gpkg, data/processed/inland/nodes.gpkg
+    output: data/processed/transshipment/edges.gpkg
+    jobid: 11
+    reason: Missing output files: data/processed/transshipment/edges.gpkg; Input files updated by another job: data/processed/inland/nodes.gpkg, data/processed/road/nodes.gpkg, data/processed/rail/nodes.gpkg, data/processed/ports/nodes.gpkg
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:32 2026]
+Finished jobid: 11 (Rule: build_transshipment)
+10 of 17 steps (59%) done
+[Tue May  5 18:03:33 2026]
+Finished jobid: 5 (Rule: stitch_road)
+11 of 17 steps (65%) done
+[Tue May  5 18:03:38 2026]
+Finished jobid: 8 (Rule: build_maritime)
+12 of 17 steps (71%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue May  5 18:03:38 2026]
+localrule assemble_graph:
+    input: data/processed/road/edges.gpkg, data/processed/road/stitch.gpkg, data/processed/rail/edges.gpkg, data/processed/maritime/edges.gpkg, data/processed/inland/edges.gpkg, data/processed/transshipment/edges.gpkg
+    output: data/processed/graph.pkl, data/processed/graph.gpkg
+    jobid: 3
+    reason: Missing output files: data/processed/graph.gpkg, data/processed/graph.pkl; Input files updated by another job: data/processed/road/edges.gpkg, data/processed/maritime/edges.gpkg, data/processed/transshipment/edges.gpkg, data/processed/rail/edges.gpkg, data/processed/inland/edges.gpkg, data/processed/road/stitch.gpkg
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:51 2026]
+Finished jobid: 3 (Rule: assemble_graph)
+13 of 17 steps (76%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue May  5 18:03:51 2026]
+localrule attach_attributes:
+    input: data/processed/graph.pkl, config/lpi_country_factors.csv
+    output: data/processed/graph_weighted.pkl
+    jobid: 2
+    reason: Missing output files: data/processed/graph_weighted.pkl; Input files updated by another job: data/processed/graph.pkl
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:53 2026]
+Finished jobid: 2 (Rule: attach_attributes)
+14 of 17 steps (82%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue May  5 18:03:53 2026]
+localrule snap_destinations:
+    input: data/processed/graph_weighted.pkl, data/processed/dest_cells.parquet
+    output: data/processed/dest_snapped.parquet
+    jobid: 14
+    reason: Missing output files: data/processed/dest_snapped.parquet; Input files updated by another job: data/processed/graph_weighted.pkl, data/processed/dest_cells.parquet
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:54 2026]
+Finished jobid: 14 (Rule: snap_destinations)
+15 of 17 steps (88%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue May  5 18:03:54 2026]
+localrule route_sources:
+    input: data/processed/graph_weighted.pkl, data/processed/dest_snapped.parquet, config/sources_demo.csv
+    output: results/routes.zarr, results/routes.zarr/.zgroup
+    jobid: 1
+    reason: Input files updated by another job: data/processed/graph_weighted.pkl, data/processed/dest_snapped.parquet
+    resources: tmpdir=/tmp
+Touching output file results/routes.zarr/.zgroup.
+[Tue May  5 18:03:56 2026]
+Finished jobid: 1 (Rule: route_sources)
+16 of 17 steps (94%) done
+Select jobs to execute...
+Execute 1 jobs...
+[Tue May  5 18:03:56 2026]
+localrule all:
+    input: results/routes.zarr/.zgroup, data/processed/graph.gpkg
+    jobid: 0
+    reason: Input files updated by another job: results/routes.zarr/.zgroup, data/processed/graph.gpkg
+    resources: tmpdir=/tmp
+[Tue May  5 18:03:56 2026]
+Finished jobid: 0 (Rule: all)
+17 of 17 steps (100%) done
+Complete log(s): /home/koen/Dokument/Research/Code/global-bulk-transport/.snakemake/log/2026-05-05T180325.994701.snakemake.log
