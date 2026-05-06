@@ -23,6 +23,8 @@ from global_bulk_transport.config import path, project_config
 app = FastAPI(title="global-bulk-transport viz")
 
 ROUTES_PATH = Path(path("results")) / "routes.zarr"
+ROUTES_RANDOM_PATH = Path(path("results")) / "routes_random.zarr"
+ENVELOPE_PATH = Path(path("results")) / "envelope.zarr"
 GRAPH_PATH = Path(path("data_processed")) / "graph_weighted.pkl"
 EDGES_GPKG = Path(path("data_processed")) / "graph.gpkg"
 DESTS_PATH = Path(path("data_processed")) / "dest_snapped.parquet"
@@ -184,6 +186,67 @@ def _snap_dest_node(lon: float, lat: float) -> tuple[int | None, float, float]:
     return _name_to_idx.get(sel["snap_node_id"]), float(sel["lon"]), float(sel["lat"])
 
 
+def _serialize_path(g, s_idx: int, t_idx: int, metric: str,
+                    click: tuple[float, float], dest_cell: tuple[float, float],
+                    extra: dict | None = None) -> dict:
+    """Run shortest-path on the loaded graph and return a GeoJSON-ish dict
+    with per-mode totals. Shared by /route and /envelope/route."""
+    eids = g.get_shortest_paths(v=s_idx, to=t_idx, weights=metric, output="epath")[0]
+    src_xy = [float(g.vs[s_idx]["x"]), float(g.vs[s_idx]["y"])]
+    dst_xy = [float(g.vs[t_idx]["x"]), float(g.vs[t_idx]["y"])]
+    if not eids:
+        return {
+            "type": "FeatureCollection", "features": [], "by_mode": [],
+            "totals": dict.fromkeys(METRICS, 0.0),
+            "src": src_xy, "dst": dst_xy,
+            "click": list(click), "dest_cell": list(dest_cell),
+            **(extra or {}),
+        }
+
+    features = []
+    by_mode: dict[str, dict] = {}
+    for eid in eids:
+        e = g.es[eid]
+        mode = e["mode"]
+        length_km = float(e["length_km"] or 0.0)
+        cost_total = float(e["cost_total"] or 0.0)
+        co2_total = float(e["co2_total"] or 0.0)
+        # Skip transshipment hops in the geometry layer — they have zero
+        # length and would just stack a marker on top of the port node.
+        if mode != "transshipment":
+            features.append({
+                "type": "Feature",
+                "geometry": {"type": "LineString", "coordinates": _edge_coords(eid)},
+                "properties": {
+                    "mode": mode, "length_km": length_km,
+                    "cost_total": cost_total, "co2_total": co2_total,
+                },
+            })
+        agg = by_mode.setdefault(
+            mode, {"mode": mode, "edges": 0, "length_km": 0.0,
+                   "cost_total": 0.0, "co2_total": 0.0},
+        )
+        agg["edges"] += 1
+        agg["length_km"] += length_km
+        agg["cost_total"] += cost_total
+        agg["co2_total"] += co2_total
+
+    totals = {
+        "length_km":  sum(m["length_km"]  for m in by_mode.values()),
+        "cost_total": sum(m["cost_total"] for m in by_mode.values()),
+        "co2_total":  sum(m["co2_total"]  for m in by_mode.values()),
+    }
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+        "by_mode": sorted(by_mode.values(), key=lambda r: -r["length_km"]),
+        "totals": totals,
+        "src": src_xy, "dst": dst_xy,
+        "click": list(click), "dest_cell": list(dest_cell),
+        **(extra or {}),
+    }
+
+
 @app.get("/route/{source_id}")
 def route(source_id: str, lon: float, lat: float, metric: str = "cost_total"):
     if metric not in METRICS:
@@ -204,61 +267,136 @@ def route(source_id: str, lon: float, lat: float, metric: str = "cost_total"):
     if t_idx is None:
         raise HTTPException(404, "destination cell not found in dest_snapped table")
 
-    eids = g.get_shortest_paths(v=s_idx, to=t_idx, weights=metric, output="epath")[0]
-    if not eids:
+    return JSONResponse(_serialize_path(
+        g, s_idx, t_idx, metric, (lon, lat), (dest_lon, dest_lat),
+    ))
+
+
+# ============================================================================
+# Envelope: cheapest-source-per-cell over the random-source POC
+# ============================================================================
+
+def _open_envelope():
+    if not ENVELOPE_PATH.exists():
+        raise HTTPException(
+            503,
+            f"envelope.zarr not built yet at {ENVELOPE_PATH}; "
+            "run `pixi run sample-sources && pixi run route-random && pixi run envelope`",
+        )
+    return xr.open_zarr(ENVELOPE_PATH)
+
+
+@app.get("/envelope/grid")
+def envelope_grid(metric: str = "cost_total"):
+    if metric not in METRICS:
+        raise HTTPException(400, f"unknown metric {metric}")
+    ds = _open_envelope()
+
+    vmin = ds[f"{metric}_min"].values
+    argmin = ds[f"{metric}_argmin"].values
+    lons = ds["lon"].values
+    lats = ds["lat"].values
+    finite = np.isfinite(vmin) & (argmin >= 0)
+
+    sources = [
+        {
+            "source_id": str(ds["source_id"].values[i]),
+            "name":      str(ds["source_name"].values[i]),
+            "lon":       float(ds["source_lon"].values[i]),
+            "lat":       float(ds["source_lat"].values[i]),
+        }
+        for i in range(ds.sizes["source"])
+    ]
+
+    if not finite.any():
         return JSONResponse({
-            "type": "FeatureCollection", "features": [], "by_mode": [],
-            "totals": {m: 0.0 for m in METRICS},
-            "src": [float(g.vs[s_idx]["x"]), float(g.vs[s_idx]["y"])],
-            "dst": [float(g.vs[t_idx]["x"]), float(g.vs[t_idx]["y"])],
-            "click": [lon, lat], "dest_cell": [dest_lon, dest_lat],
+            "metric": metric, "n": 0, "breaks": [], "stats": {},
+            "histogram": [], "cells": [], "sources": sources,
         })
 
-    features = []
-    by_mode: dict[str, dict] = {}
-    for eid in eids:
-        e = g.es[eid]
-        mode = e["mode"]
-        length_km = float(e["length_km"] or 0.0)
-        cost_total = float(e["cost_total"] or 0.0)
-        co2_total = float(e["co2_total"] or 0.0)
-        # Skip transshipment hops in the geometry layer — they have zero
-        # length and would just stack a marker on top of the port node.
-        if mode != "transshipment":
-            features.append({
-                "type": "Feature",
-                "geometry": {"type": "LineString", "coordinates": _edge_coords(eid)},
-                "properties": {
-                    "mode": mode,
-                    "length_km": length_km,
-                    "cost_total": cost_total,
-                    "co2_total": co2_total,
-                },
-            })
-        agg = by_mode.setdefault(
-            mode, {"mode": mode, "edges": 0, "length_km": 0.0,
-                   "cost_total": 0.0, "co2_total": 0.0},
-        )
-        agg["edges"] += 1
-        agg["length_km"] += length_km
-        agg["cost_total"] += cost_total
-        agg["co2_total"] += co2_total
-
-    totals = {
-        "length_km":  sum(m["length_km"]  for m in by_mode.values()),
-        "cost_total": sum(m["cost_total"] for m in by_mode.values()),
-        "co2_total":  sum(m["co2_total"]  for m in by_mode.values()),
-    }
-    return JSONResponse({
-        "type": "FeatureCollection",
-        "features": features,
-        "by_mode": sorted(by_mode.values(), key=lambda r: -r["length_km"]),
-        "totals": totals,
-        "src": [float(g.vs[s_idx]["x"]), float(g.vs[s_idx]["y"])],
-        "dst": [float(g.vs[t_idx]["x"]), float(g.vs[t_idx]["y"])],
-        "click": [lon, lat],
-        "dest_cell": [dest_lon, dest_lat],
+    v = vmin[finite]
+    df = pd.DataFrame({
+        "lon": lons[finite], "lat": lats[finite],
+        "v": v, "src": argmin[finite].astype(int),
     })
+    q = np.quantile(df["v"], np.linspace(0.02, 0.98, 9))
+    stats = {
+        "min": float(df["v"].min()),
+        "p10": float(np.quantile(df["v"], 0.10)),
+        "median": float(df["v"].median()),
+        "mean": float(df["v"].mean()),
+        "p90": float(np.quantile(df["v"], 0.90)),
+        "max": float(df["v"].max()),
+    }
+    hist_edges = np.linspace(q[0], q[-1], 25)
+    hist_counts, _ = np.histogram(df["v"], bins=hist_edges)
+    histogram = [
+        {"x0": float(hist_edges[i]), "x1": float(hist_edges[i+1]), "n": int(hist_counts[i])}
+        for i in range(len(hist_counts))
+    ]
+    return JSONResponse({
+        "metric": metric, "n": int(len(df)),
+        "breaks": q.tolist(), "stats": stats, "histogram": histogram,
+        "cells": df.to_dict(orient="records"),
+        "sources": sources,
+    })
+
+
+@app.get("/envelope/route")
+def envelope_route(lon: float, lat: float, metric: str = "cost_total"):
+    """Click-handler for the envelope view: find the winning source for the
+    nearest dest cell and return its actual path."""
+    if metric not in METRICS:
+        raise HTTPException(400, f"unknown metric {metric}")
+    g, edges, name_to_idx, _ = _load_routing_artefacts()
+    ds = _open_envelope()
+
+    # Find the closest dest cell.
+    cell_lons = ds["lon"].values
+    cell_lats = ds["lat"].values
+    d = np.abs(cell_lons - lon) + np.abs(cell_lats - lat)
+    j = int(np.argmin(d))
+    if d[j] > 0.6:
+        raise HTTPException(404, "no envelope cell near click")
+    argmin_arr = ds[f"{metric}_argmin"].values
+    src_idx = int(argmin_arr[j])
+    if src_idx < 0:
+        raise HTTPException(404, "cell not reached by any source")
+
+    sid = str(ds["source_id"].values[src_idx])
+    src_lon = float(ds["source_lon"].values[src_idx])
+    src_lat = float(ds["source_lat"].values[src_idx])
+    src_name = str(ds["source_name"].values[src_idx])
+
+    # Pull snap_node_id from the per-source group of routes_random.zarr.
+    try:
+        src_ds = xr.open_zarr(ROUTES_RANDOM_PATH, group=sid)
+    except (KeyError, FileNotFoundError) as e:
+        raise HTTPException(503, f"routes_random.zarr missing source {sid}") from e
+    s_node = src_ds.attrs.get("snap_node_id")
+    s_idx = name_to_idx.get(s_node) if s_node else None
+    if s_idx is None:
+        raise HTTPException(500, f"source {sid} snap node not in graph")
+
+    t_idx, dest_lon, dest_lat = _snap_dest_node(float(cell_lons[j]), float(cell_lats[j]))
+    if t_idx is None:
+        raise HTTPException(404, "destination cell not in dest_snapped table")
+
+    extra = {
+        "winning_source": {
+            "source_id": sid, "name": src_name,
+            "lon": src_lon, "lat": src_lat, "index": src_idx,
+        },
+        "envelope_value": float(ds[f"{metric}_min"].values[j]),
+    }
+    return JSONResponse(_serialize_path(
+        g, s_idx, t_idx, metric, (lon, lat), (dest_lon, dest_lat), extra,
+    ))
+
+
+@app.get("/envelope", response_class=HTMLResponse)
+def envelope_page():
+    return (Path(__file__).resolve().parent / "static" / "envelope.html").read_text()
 
 
 @app.get("/", response_class=HTMLResponse)

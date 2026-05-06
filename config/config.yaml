@@ -45,3 +45,9 @@ routing:
 viz:
   host: "127.0.0.1"
   port: 8000
+
+# Random-source envelope POC: sample N random land points, route each to
+# the global cropland grid, then take the per-cell argmin across sources.
+envelope:
+  n_sources: 200
+  seed: 0

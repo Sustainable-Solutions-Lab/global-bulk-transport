@@ -26,6 +26,7 @@ include: "rules/cropland.smk"
 include: "rules/attributes.smk"
 include: "rules/snapping.smk"
 include: "rules/routing.smk"
+include: "rules/envelope.smk"
 
 rule all:
     input:

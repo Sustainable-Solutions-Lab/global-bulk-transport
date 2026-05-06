@@ -18,6 +18,10 @@ figure             = "python -m global_bulk_transport.viz.figure --source basalt
 query              = "python -m global_bulk_transport.routing.query"
 validate-sea       = "python -m global_bulk_transport.routing.validate_sea"
 fetch-lpi          = "python -m global_bulk_transport.network.fetch_lpi"
+sample-sources     = "snakemake -s workflow/Snakefile --cores 1 sample_sources"
+route-random       = "snakemake -s workflow/Snakefile --cores 4 route_random"
+envelope           = "snakemake -s workflow/Snakefile --cores 4 envelope"
+figure-envelope    = "python -m global_bulk_transport.viz.figure --mode envelope --metric cost_total"
 
 [dependencies]
 python = ">=3.11,<3.13"
