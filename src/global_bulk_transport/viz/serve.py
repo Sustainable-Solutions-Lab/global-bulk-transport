@@ -91,7 +91,7 @@ def grid(source_id: str, metric: str = "cost_total"):
     if len(df) == 0:
         return JSONResponse({
             "source_id": source_id, "metric": metric, "n": 0,
-            "breaks": [], "stats": {}, "histogram": [], "top": [], "cells": [],
+            "breaks": [], "stats": {}, "histogram": [], "cells": [],
         })
 
     # Quantile breaks for the colour scale; 9 stops give a smooth gradient.
@@ -111,10 +111,6 @@ def grid(source_id: str, metric: str = "cost_total"):
         {"x0": float(hist_edges[i]), "x1": float(hist_edges[i+1]), "n": int(hist_counts[i])}
         for i in range(len(hist_counts))
     ]
-    top = (
-        df.nsmallest(min(8, len(df)), "v")
-          .to_dict(orient="records")
-    )
     return JSONResponse({
         "source_id": source_id,
         "metric": metric,
@@ -122,7 +118,6 @@ def grid(source_id: str, metric: str = "cost_total"):
         "breaks": q.tolist(),
         "stats": stats,
         "histogram": histogram,
-        "top": top,
         "cells": df.to_dict(orient="records"),
     })
 

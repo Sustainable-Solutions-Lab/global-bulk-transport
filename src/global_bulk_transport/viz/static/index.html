@@ -97,14 +97,17 @@
 
     .top-list { margin-top: 4px; font-size: 12px; }
     .top-list .row {
-      display: grid; grid-template-columns: auto 1fr auto;
-      align-items: center; gap: 8px;
+      display: grid; grid-template-columns: 1fr auto;
+      align-items: baseline; gap: 8px;
       padding: 5px 8px; border-radius: 5px; cursor: pointer;
       transition: background .12s;
     }
     .top-list .row:hover { background: #f1f3f8; }
-    .top-list .row .rank { font-size: 10px; color: var(--muted); width: 16px; font-family: monospace; }
-    .top-list .row .loc { color: var(--ink-2); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .top-list .row.disabled { cursor: default; opacity: 0.55; }
+    .top-list .row.disabled:hover { background: transparent; }
+    .top-list .row .name { color: var(--ink); font-weight: 500; }
+    .top-list .row .loc { color: var(--muted); font-family: 'JetBrains Mono', monospace;
+                          font-size: 10px; margin-left: 6px; }
     .top-list .row .val { font-weight: 600; font-variant-numeric: tabular-nums; }
 
     .footer-tip {
@@ -253,8 +256,8 @@
       <svg id="histogram" viewBox="0 0 320 56" preserveAspectRatio="none"></svg>
     </div>
 
-    <h2>top 8 cheapest destinations</h2>
-    <div id="top-list" class="top-list"></div>
+    <h2>representative destinations</h2>
+    <div id="rep-list" class="top-list"></div>
 
     <h2>about</h2>
     <div class="footer-tip">
@@ -505,22 +508,58 @@ function renderHistogram(hist, breaks) {
   svg.appendChild(line);
 }
 
-function renderTopList(top, metric) {
-  const el = document.getElementById('top-list');
+// Hand-picked agricultural regions spanning continents — these stay fixed
+// across sources so the side panel shows comparable delivered values, not
+// just whatever happens to sit a few cells away.
+const REP_LOCATIONS = [
+  { name: 'Iowa Corn Belt',     lon: -93.5, lat:  42.0 },
+  { name: 'Pampas (AR)',        lon: -61.0, lat: -34.5 },
+  { name: 'Mato Grosso (BR)',   lon: -55.0, lat: -13.0 },
+  { name: 'Beauce (FR)',        lon:   1.5, lat:  48.2 },
+  { name: 'Ukrainian Steppe',   lon:  33.0, lat:  49.0 },
+  { name: 'Punjab (IN)',        lon:  75.5, lat:  30.5 },
+  { name: 'North China Plain',  lon: 115.0, lat:  35.0 },
+  { name: 'Java (ID)',          lon: 110.5, lat:  -7.5 },
+  { name: 'Nigerian Belt',      lon:   8.0, lat:  10.0 },
+  { name: 'Murray-Darling (AU)',lon: 146.0, lat: -34.5 },
+];
+
+// Find the cell whose center is closest (L1) to (lon, lat). Returns null if
+// the closest cell sits outside ~1.5° — the representative region is then
+// not on the cropland-masked dest grid (e.g. Java's narrow strips can miss).
+function nearestCell(cells, lon, lat) {
+  let best = null, bestD = Infinity;
+  for (const c of cells) {
+    const d = Math.abs(c.lon - lon) + Math.abs(c.lat - lat);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return bestD <= 1.5 ? best : null;
+}
+
+function renderRepList(cells, metric) {
+  const el = document.getElementById('rep-list');
   el.innerHTML = '';
-  if (!top || !top.length) { el.innerHTML = '<div class="meta" style="color:var(--muted)">no reachable cells</div>'; return; }
   const F = FORMATS[metric];
-  top.forEach((t, i) => {
+  REP_LOCATIONS.forEach(rep => {
+    const cell = (cells && cells.length) ? nearestCell(cells, rep.lon, rep.lat) : null;
     const row = document.createElement('div');
-    row.className = 'row';
-    row.innerHTML =
-      `<span class="rank">${i+1}.</span>` +
-      `<span class="loc">${t.lon.toFixed(2)}, ${t.lat.toFixed(2)}</span>` +
-      `<span class="val">${F.short(t.v)}<span class="unit" style="color:var(--muted);font-size:10px;font-weight:500;margin-left:3px">${F.unit}</span></span>`;
-    row.addEventListener('click', () => {
-      map.flyTo([t.lat, t.lon], 5, { duration: 0.7 });
-      onCellClick(t, F);
-    });
+    if (cell) {
+      row.className = 'row';
+      row.innerHTML =
+        `<span><span class="name">${rep.name}</span>` +
+        `<span class="loc">${rep.lon.toFixed(0)}, ${rep.lat.toFixed(0)}</span></span>` +
+        `<span class="val">${F.short(cell.v)}<span class="unit" style="color:var(--muted);font-size:10px;font-weight:500;margin-left:3px">${F.unit}</span></span>`;
+      row.addEventListener('click', () => {
+        map.flyTo([cell.lat, cell.lon], 5, { duration: 0.7 });
+        onCellClick(cell, F);
+      });
+    } else {
+      row.className = 'row disabled';
+      row.innerHTML =
+        `<span><span class="name">${rep.name}</span>` +
+        `<span class="loc">${rep.lon.toFixed(0)}, ${rep.lat.toFixed(0)}</span></span>` +
+        `<span class="val" style="color:var(--muted)">—</span>`;
+    }
     el.appendChild(row);
   });
 }
@@ -547,11 +586,12 @@ async function loadGrid() {
     const j = await r.json();
     if (j.n === 0) {
       renderStats({ min:0, median:0, max:0 }, selectedMetric, 0, selectedSrc.name);
+      renderRepList([], selectedMetric);
       return;
     }
     renderStats(j.stats, selectedMetric, j.n, selectedSrc.name);
     renderHistogram(j.histogram, j.breaks);
-    renderTopList(j.top, selectedMetric);
+    renderRepList(j.cells, selectedMetric);
 
     const F = FORMATS[selectedMetric];
     const halfRes = 0.25;
