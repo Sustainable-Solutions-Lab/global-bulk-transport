@@ -31,8 +31,22 @@ exact CLI invocations.
 
 ## Demo output
 
-Routing one of the demo sources (Columbia River basalt) for delivered
-cost across the global 0.5° destination grid:
+The local viz (`pixi run viz` → http://127.0.0.1:8000):
+
+![viz — Columbia River basalt, default global view](results/figures/viz_columbia_default.png)
+
+Pick a source quarry on the map or in the dropdown; toggle metric
+(cost / CO₂ / distance); hover any 0.5° cell for its delivered
+value; click for a pinned popup; click any of the top-8 cheapest
+destinations in the side panel to fly to it. The summary card shows
+min/median/max and a histogram colored to the same legend.
+
+Zoomed onto the source area, the cropland mask (Ramankutty 2008) and
+the per-cell tiling are crisp:
+
+![viz — zoomed to North America cropland](results/figures/viz_zoom_us.png)
+
+Static snapshot for use in papers/presentations:
 
 ![Columbia River basalt — delivered cost USD/t](results/figures/basalt_columbia_cost_total.png)
 

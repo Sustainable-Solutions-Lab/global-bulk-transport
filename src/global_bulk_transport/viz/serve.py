@@ -70,16 +70,41 @@ def grid(source_id: str, metric: str = "cost_total"):
         "lat": lats[finite],
         "v": arr[finite],
     })
-    # quantile breaks for color scale
-    if len(df) >= 5:
-        q = np.quantile(df["v"], [0.05, 0.25, 0.5, 0.75, 0.95])
-    else:
-        q = np.linspace(df["v"].min() if len(df) else 0, df["v"].max() if len(df) else 1, 5)
+    if len(df) == 0:
+        return JSONResponse({
+            "source_id": source_id, "metric": metric, "n": 0,
+            "breaks": [], "stats": {}, "histogram": [], "top": [], "cells": [],
+        })
+
+    # Quantile breaks for the colour scale; 9 stops give a smooth gradient.
+    q = np.quantile(df["v"], np.linspace(0.02, 0.98, 9))
+    stats = {
+        "min": float(df["v"].min()),
+        "p10": float(np.quantile(df["v"], 0.10)),
+        "median": float(df["v"].median()),
+        "mean": float(df["v"].mean()),
+        "p90": float(np.quantile(df["v"], 0.90)),
+        "max": float(df["v"].max()),
+    }
+    # Histogram for the sidebar mini-chart (24 bins, span the q02–q98 range).
+    hist_edges = np.linspace(q[0], q[-1], 25)
+    hist_counts, _ = np.histogram(df["v"], bins=hist_edges)
+    histogram = [
+        {"x0": float(hist_edges[i]), "x1": float(hist_edges[i+1]), "n": int(hist_counts[i])}
+        for i in range(len(hist_counts))
+    ]
+    top = (
+        df.nsmallest(min(8, len(df)), "v")
+          .to_dict(orient="records")
+    )
     return JSONResponse({
         "source_id": source_id,
         "metric": metric,
         "n": len(df),
         "breaks": q.tolist(),
+        "stats": stats,
+        "histogram": histogram,
+        "top": top,
         "cells": df.to_dict(orient="records"),
     })
 

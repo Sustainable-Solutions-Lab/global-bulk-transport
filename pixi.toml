@@ -53,4 +53,5 @@ pip = "*"
 [pypi-dependencies]
 snkit = "*"
 searoute = "*"
+playwright = "*"
 global-bulk-transport = { path = ".", editable = true }
