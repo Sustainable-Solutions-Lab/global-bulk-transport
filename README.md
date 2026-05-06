@@ -2,10 +2,10 @@
 
 Global multimodal bulk-transport graph (road + rail + maritime + inland
 waterway) with cost (USD) and CO2 (g) attribution per edge, plus
-per-source destination-grid routing for downstream Enhanced Rock
-Weathering (ERW) research.
+per-source destination-grid routing for Enhanced Rock Weathering (ERW)
+research.
 
-This is the **transport / emissions layer** of a wider ERW project. It
+This project focusses on **transportation costs and emissions**. It
 is also independently usable: take a quarry coordinate, get back a 0.5°
 global grid of "cheapest" / "lowest-CO2" / "shortest" delivered cost.
 
@@ -43,28 +43,18 @@ road, blue rail, teal sea, cyan barge) with a per-mode km breakdown
 in the popup chips. Above: the cost-optimal Columbia River → Gulf-of-
 Mexico route surprisingly leaves the continent and rounds Panama by
 sea, because that path is cheaper per tonne than the cross-continental
-rail/road alternative.
-
-The route engine handles antimeridian crossings, so trans-Pacific
-corridors (US PNW → East Asia, Patagonia → Australia, …) render
-correctly across the dateline:
+rail/road alternative. Below, and example of a trans-pacific route:
 
 ![viz — trans-Pacific cost-optimal route, Columbia River basalt → Tokyo](results/figures/viz_columbia_route_tokyo.png)
 
-Zoomed onto the source area, the cropland mask (Ramankutty 2008) and
-the per-cell tiling are crisp; clicking a destination shows the
-maritime + short road segments distinctly:
+Clicking a destination shows the maritime + short road segments
+distinctly:
 
 ![viz — Iceland basalt → Rotterdam, maritime + road legs](results/figures/viz_iceland_route_rotterdam.png)
 
 Static snapshot for use in papers/presentations:
 
 ![Columbia River basalt — delivered cost USD/t](results/figures/basalt_columbia_cost_total.png)
-
-Western North America has the cheapest delivery (continuous road/rail
-network and short Pacific-coast ocean access); West Africa and the
-Russian/Tibetan interior land in the most expensive bracket because they
-either have no rail loadout or require multi-leg road-only routing.
 
 Generate equivalents for any source:
 
@@ -140,4 +130,4 @@ quantitative external validation is in `docs/validation.md`. In short:
 
 ## License
 
-MIT.
+Released under the MIT License — see [LICENSE](LICENSE).

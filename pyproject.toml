@@ -8,7 +8,8 @@ version = "0.1.0"
 description = "Global multimodal bulk-transport graph with cost & CO2 attribution for ERW research"
 requires-python = ">=3.11"
 authors = [{name = "Koen", email = "koenvg@posteo.net"}]
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
