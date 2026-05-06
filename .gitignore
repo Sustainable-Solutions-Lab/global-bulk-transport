@@ -2,6 +2,9 @@
 .pixi/
 *.lock
 
+# snakemake
+.snakemake/
+
 # python
 __pycache__/
 *.py[cod]
