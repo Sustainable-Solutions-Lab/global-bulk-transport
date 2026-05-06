@@ -76,6 +76,7 @@ table, using the already-built weighted graph and snapped destinations.
 | `config/transshipment.yaml`      | Per-tonne handling cost & CO2 at multimodal interconnects |
 | `config/inland_waterways.geojson`| Hand-encoded major inland-bulk-freight systems |
 | `docs/methodology.md`            | **Single central document** for methods, assumptions, citations, limitations |
+| `docs/validation.md`             | External validation: distance / cost / CO2 cross-checks against published port-pair data, USDA, Drewry, EcoTransIT, IMO 4th GHG |
 | `workflow/`                      | Snakemake workflow (per-mode `.smk` rules, mirroring Open-GIRA structure) |
 | `tests/`                         | pytest smoke tests (run `pixi run test`) |
 | `src/global_bulk_transport/`     | Code |
@@ -83,18 +84,31 @@ table, using the already-built weighted graph and snapped destinations.
 
 ## Design choices and limitations
 
-A complete description lives in `docs/methodology.md` § 8. In short:
+A complete description lives in `docs/methodology.md` § 8 and a
+quantitative external validation is in `docs/validation.md`. In short:
 
 - We do **not** run Open-GIRA on a planet OSM file in this repo (not
   feasible at single-workstation timescales). We mirror Open-GIRA's
   per-mode structure but seed each mode with pre-cleaned global
-  datasets (Natural Earth roads + railroads, World Port Index ports,
-  hand-encoded inland waterways). The Snakemake interface accepts
-  drop-in Open-GIRA outputs with the same edge/node schema.
+  datasets: Natural Earth 10m roads + railroads + ports, hand-encoded
+  inland waterways (25 systems, ~290 per-segment edges), and a
+  hub-and-spoke maritime layer built via `searoute`. The Snakemake
+  interface accepts drop-in Open-GIRA outputs with the same edge/node
+  schema.
+- The cropland mask uses Ramankutty et al. (2008) M3-Cropland 2000 at
+  5-arcmin, aggregated to 0.5° (~20 000 cropland cells, 16 000
+  road-snappable).
 - Cost and CO2 numbers are explicitly 2020–2024 USD reference and per
   the methodology of EcoTransIT (CO2), IMO 4th GHG (sea CO2), USACE
-  (barge), Verschuur 2025 (country road cost), and the World Bank LPI
-  (country adjustments).
+  (barge), and the World Bank LPI 2023 (country adjustments — auto-
+  derived for 155 countries; ~20 hand-set yaml overrides take
+  precedence where domain knowledge differs).
+- External validation (`docs/validation.md`) shows mean absolute error
+  ≈ 10.7 % on 11 published port-pair distances, USDA Mississippi grain
+  rates bracket our $0.0075/tkm barge cost, and IMO/EcoTransIT CO2
+  factors match within ranges. The largest residual errors are on
+  Suez-canal-routed corridors where `searoute`'s coarse sea graph
+  cuts shortcuts that real shipping avoids.
 - Outputs store *terminal* per-(source, dest) values (length / cost /
   CO2), not full paths. Re-routing a single source is fast enough that
   storing paths is not worth the disk.
