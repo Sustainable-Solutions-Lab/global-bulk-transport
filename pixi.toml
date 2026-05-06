@@ -16,6 +16,8 @@ test               = "pytest -q tests"
 graph-stats        = "python -m global_bulk_transport.network.stats"
 figure             = "python -m global_bulk_transport.viz.figure --source basalt_columbia --metric cost_total"
 query              = "python -m global_bulk_transport.routing.query"
+validate-sea       = "python -m global_bulk_transport.routing.validate_sea"
+fetch-lpi          = "python -m global_bulk_transport.network.fetch_lpi"
 
 [dependencies]
 python = ">=3.11,<3.13"

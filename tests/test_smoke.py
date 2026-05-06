@@ -106,6 +106,34 @@ def test_query_cli_returns_results():
     assert df["value"].iloc[0] >= 0
 
 
+@pytest.mark.skipif(not (PROC / "graph_weighted.pkl").exists(), reason="build not run")
+def test_sea_distance_validation_within_tolerance():
+    """Mean abs distance error vs 11 published port-pair distances must
+    be < 15 % — guard against future regressions in maritime topology."""
+    import io
+    import contextlib
+    import sys
+    from global_bulk_transport.routing import validate_sea
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = validate_sea.main()
+    out = buf.getvalue()
+    assert "mean |Δ|" in out
+    assert rc == 0
+
+
+@pytest.mark.skipif(not (PROC / "graph_weighted.pkl").exists(), reason="build not run")
+def test_lpi_factors_loaded():
+    from global_bulk_transport.attributes.lookup import _lpi_table
+    df = _lpi_table()
+    assert df is not None
+    assert len(df) >= 100
+    # UAE infra-LPI 4.1 should give factor 0.70
+    assert abs(df.loc["AE", "road_cost_factor"] - 0.70) < 0.01
+    # Afghanistan ≈ 1.47
+    assert df.loc["AF", "road_cost_factor"] > 1.4
+
+
 @pytest.mark.skipif(not (RES / "routes.zarr").exists(), reason="routing not run")
 def test_routes_metrics_diverge():
     """Length-, cost- and CO2-optimal routes are not perfectly collinear."""
