@@ -33,18 +33,29 @@ exact CLI invocations.
 
 The local viz (`pixi run viz` → http://127.0.0.1:8000):
 
-![viz — Columbia River basalt, default global view](results/figures/viz_columbia_default.png)
+![viz — Columbia River basalt, cost-optimal route to the Gulf](results/figures/viz_columbia_route_no.png)
 
 Pick a source quarry on the map or in the dropdown; toggle metric
 (cost / CO₂ / distance); hover any 0.5° cell for its delivered
-value; click for a pinned popup; click any of the top-8 cheapest
-destinations in the side panel to fly to it. The summary card shows
-min/median/max and a histogram colored to the same legend.
+value. **Click any cell to draw the actual multimodal route** the
+SSSP found from source to that destination — colored by mode (orange
+road, blue rail, teal sea, cyan barge) with a per-mode km breakdown
+in the popup chips. Above: the cost-optimal Columbia River → Gulf-of-
+Mexico route surprisingly leaves the continent and rounds Panama by
+sea, because that path is cheaper per tonne than the cross-continental
+rail/road alternative.
+
+The route engine handles antimeridian crossings, so trans-Pacific
+corridors (US PNW → East Asia, Patagonia → Australia, …) render
+correctly across the dateline:
+
+![viz — trans-Pacific cost-optimal route, Columbia River basalt → Tokyo](results/figures/viz_columbia_route_tokyo.png)
 
 Zoomed onto the source area, the cropland mask (Ramankutty 2008) and
-the per-cell tiling are crisp:
+the per-cell tiling are crisp; clicking a destination shows the
+maritime + short road segments distinctly:
 
-![viz — zoomed to North America cropland](results/figures/viz_zoom_us.png)
+![viz — Iceland basalt → Rotterdam, maritime + road legs](results/figures/viz_iceland_route_rotterdam.png)
 
 Static snapshot for use in papers/presentations:
 

@@ -189,6 +189,18 @@
       box-shadow: 0 1px 3px rgba(0,0,0,.25);
     }
 
+    /* per-mode route breakdown chips inside the popup */
+    .route-bd { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .route-bd .chip {
+      font-family: 'JetBrains Mono', monospace; font-size: 10.5px;
+      padding: 2px 6px; border-radius: 10px; color: #fff;
+      white-space: nowrap;
+    }
+    .route-bd .chip.road            { background: #d97706; }
+    .route-bd .chip.rail            { background: #1a73c4; }
+    .route-bd .chip.maritime        { background: #0e7490; }
+    .route-bd .chip.inland_waterway { background: #2dd4bf; color: #14181f; }
+
     /* popup polish */
     .leaflet-popup-content-wrapper { border-radius: 6px; }
     .leaflet-popup-content { font-size: 12px; line-height: 1.5; margin: 10px 12px; }
@@ -246,7 +258,8 @@
 
     <h2>about</h2>
     <div class="footer-tip">
-      Click a quarry on the map to switch source. Click any grid cell for the per-cell value.
+      Click a quarry on the map to switch source. Click any grid cell to see the per-cell value
+      and the routed multimodal path; chips break it down by mode (km on road / rail / barge / sea).
       Methodology &amp; citations: <code>docs/methodology.md</code>; external validation: <code>docs/validation.md</code>.
     </div>
   </div>
@@ -283,11 +296,60 @@ labelsLayer.addTo(map);
 const sourceSel = document.getElementById('source');
 const cellsLayer = L.layerGroup().addTo(map);
 const sourcesLayer = L.layerGroup().addTo(map);
+const routeLayer = L.layerGroup().addTo(map);   // drawn route segments
 const pinLayer = L.layerGroup().addTo(map);
 let selectedSrc = null;
 let selectedMetric = 'cost_total';
 let legend = null;
 let allSources = [];
+
+// Split a polyline at antimeridian crossings so trans-Pacific routes
+// don't render as a flat line spanning the entire map. Input/output
+// are arrays of [lon, lat] pairs.
+//
+// searoute's outputs sometimes keep "unwrapping" past ±180 (e.g. lons
+// like −220.1 meaning ~140°E) and may also include a final jump back
+// into the natural frame. We first normalize every vertex to (−180, 180],
+// which collapses pure frame-shifts. We then walk the polyline and split
+// wherever |Δlon| > 180 between consecutive *normalized* vertices —
+// that is a real antimeridian crossing — interpolating the latitude at
+// the boundary linearly.
+function splitAntimeridian(coords) {
+  if (coords.length < 2) return [coords];
+  const norm = coords.map(([lon, lat]) => {
+    let l = ((lon + 180) % 360 + 360) % 360 - 180;
+    if (l === -180) l = 180;
+    return [l, lat];
+  });
+  const out = [];
+  let cur = [norm[0]];
+  for (let i = 1; i < norm.length; ++i) {
+    const a = cur[cur.length - 1], b = norm[i];
+    const dlon = b[0] - a[0];
+    if (Math.abs(dlon) > 180) {
+      // unwrap b into a's frame so the crossing parameterizes linearly
+      const bUnwrap = [b[0] + (dlon > 0 ? -360 : 360), b[1]];
+      const edge = dlon > 0 ? -180 : 180;            // edge a is closer to
+      const t = (edge - a[0]) / (bUnwrap[0] - a[0]);
+      const latX = a[1] + t * (b[1] - a[1]);
+      cur.push([edge, latX]);
+      out.push(cur);
+      cur = [[-edge, latX], b];
+    } else {
+      cur.push(b);
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+// Mode → stroke colour. Must match the chip CSS in the stylesheet.
+const MODE_COLORS = {
+  road:            '#d97706',
+  rail:            '#1a73c4',
+  maritime:        '#0e7490',
+  inland_waterway: '#2dd4bf',
+};
 
 // Viridis sampled at 9 stops — must match the legend gradient.
 const RAMP = [
@@ -457,14 +519,7 @@ function renderTopList(top, metric) {
       `<span class="val">${F.short(t.v)}<span class="unit" style="color:var(--muted);font-size:10px;font-weight:500;margin-left:3px">${F.unit}</span></span>`;
     row.addEventListener('click', () => {
       map.flyTo([t.lat, t.lon], 5, { duration: 0.7 });
-      L.popup({ closeButton: true, autoClose: true })
-        .setLatLng([t.lat, t.lon])
-        .setContent(
-          `<div class="cell-popup">` +
-            `<b>${F.long(t.v)}</b>` +
-            `<div class="meta">${t.lon.toFixed(2)}°, ${t.lat.toFixed(2)}°</div>` +
-          `</div>`
-        ).openOn(map);
+      onCellClick(t, F);
     });
     el.appendChild(row);
   });
@@ -485,6 +540,7 @@ async function loadGrid() {
   setLoading(true);
   cellsLayer.clearLayers();
   pinLayer.clearLayers();
+  routeLayer.clearLayers();
   try {
     const r = await fetch(`/grid/${selectedSrc.source_id}?metric=${selectedMetric}`);
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -531,18 +587,88 @@ async function loadGrid() {
 
 function onCellClick(c, F) {
   pinLayer.clearLayers();
+  routeLayer.clearLayers();
   L.marker([c.lat, c.lon], {
     icon: L.divIcon({ className: '', html: '<div class="pin-icon"></div>',
                       iconSize: [12, 12], iconAnchor: [6, 6] }),
   }).addTo(pinLayer);
-  L.popup({ closeButton: true })
+  // Open a placeholder popup immediately; we'll rewrite it once the route arrives.
+  const popup = L.popup({ closeButton: true })
     .setLatLng([c.lat, c.lon])
     .setContent(
       `<div class="cell-popup">` +
         `<b>${F.long(c.v)}</b>` +
         `<div class="meta">${c.lon.toFixed(2)}°, ${c.lat.toFixed(2)}° &middot; from ${selectedSrc.name}</div>` +
+        `<div class="meta" id="route-loading">routing…</div>` +
       `</div>`
     ).openOn(map);
+  drawRoute(c, F, popup);
+}
+
+async function drawRoute(c, F, popup) {
+  if (!selectedSrc) return;
+  try {
+    const url = `/route/${selectedSrc.source_id}` +
+                `?lon=${c.lon}&lat=${c.lat}&metric=${selectedMetric}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+
+    routeLayer.clearLayers();
+    if (!j.features || !j.features.length) {
+      popup.setContent(
+        `<div class="cell-popup">` +
+          `<b>${F.long(c.v)}</b>` +
+          `<div class="meta">${c.lon.toFixed(2)}°, ${c.lat.toFixed(2)}° &middot; no path</div>` +
+        `</div>`
+      );
+      return;
+    }
+
+    // Snap leader lines: clicked cell → snapped dest node, source → snap node.
+    const leaderStyle = { color: '#8b93a3', weight: 1, opacity: 0.7,
+                          dashArray: '2 4', interactive: false };
+    L.polyline([[c.lat, c.lon], [j.dst[1], j.dst[0]]], leaderStyle).addTo(routeLayer);
+    L.polyline([[selectedSrc.lat, selectedSrc.lon], [j.src[1], j.src[0]]],
+               leaderStyle).addTo(routeLayer);
+
+    // Edge segments. Split at the antimeridian, then convert each
+    // sub-segment from GeoJSON [lon,lat] to Leaflet [lat,lon].
+    j.features.forEach(f => {
+      const color = MODE_COLORS[f.properties.mode] || '#4a5160';
+      splitAntimeridian(f.geometry.coordinates).forEach(seg => {
+        const latlng = seg.map(p => [p[1], p[0]]);
+        L.polyline(latlng, {
+          color, weight: 2.5, opacity: 0.9, interactive: false,
+        }).addTo(routeLayer);
+      });
+    });
+
+    // Per-mode breakdown chips, sorted by length already (server side).
+    const chips = j.by_mode
+      .filter(m => m.mode !== 'transshipment')
+      .map(m => {
+        const km = m.length_km.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        const lbl = m.mode === 'inland_waterway' ? 'barge' : m.mode;
+        return `<span class="chip ${m.mode}">${lbl} ${km} km</span>`;
+      }).join('');
+
+    popup.setContent(
+      `<div class="cell-popup">` +
+        `<b>${F.long(c.v)}</b>` +
+        `<div class="meta">${c.lon.toFixed(2)}°, ${c.lat.toFixed(2)}° &middot; from ${selectedSrc.name}</div>` +
+        `<div class="route-bd">${chips}</div>` +
+      `</div>`
+    );
+  } catch (e) {
+    routeLayer.clearLayers();
+    popup.setContent(
+      `<div class="cell-popup">` +
+        `<b>${F.long(c.v)}</b>` +
+        `<div class="meta">${c.lon.toFixed(2)}°, ${c.lat.toFixed(2)}° &middot; route error: ${e.message}</div>` +
+      `</div>`
+    );
+  }
 }
 
 // ============================================================================
@@ -582,6 +708,19 @@ sourceSel.addEventListener('change', () => {
 // ============================================================================
 
 async function init() {
+  // Leaflet computes its container size at construction time. With our
+  // CSS grid layout the map container occasionally lands on a stale size
+  // until the user pans/zooms, which manifests as the cell overlay being
+  // offset from the basemap. Force a recompute after the first paint and
+  // whenever #map is resized.
+  requestAnimationFrame(() => map.invalidateSize());
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => map.invalidateSize()).observe(
+      document.getElementById('map')
+    );
+  }
+  window.addEventListener('load', () => map.invalidateSize());
+
   const r = await fetch('/sources');
   allSources = await r.json();
   allSources.forEach(s => {
