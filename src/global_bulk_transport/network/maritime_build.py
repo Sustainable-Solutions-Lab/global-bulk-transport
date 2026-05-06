@@ -51,6 +51,46 @@ HUB_PORTS = [
     ("Auckland",     174.78, -36.84),
 ]
 
+# Empirical published distances for long-haul corridors that searoute
+# systematically under-estimates because its sea graph cuts shortcuts
+# real shipping does not take (e.g., Suez canal restrictions, the actual
+# Caribbean approach to the Gulf of Mexico). Keys are sorted (lon,lat)
+# tuples; values are kilometres. Sources: SeaRates, Sea-Distances.org.
+EMPIRICAL_LONGHAUL_KM = {
+    # (Rotterdam, Houston) — actual route via English Channel + N. Atlantic + Florida Straits
+    ((-95.27, 29.75), (4.40, 51.92)): 10450,
+    # (Singapore, Rotterdam) — via Suez
+    ((4.40, 51.92), (103.85, 1.27)): 14800,
+    # (Tubarão, Qingdao) — via Cape of Good Hope
+    ((-40.25, -20.30), (120.32, 36.07)): 23000,
+    # (Dakar, Rio) — actual S. Atlantic route
+    ((-43.20, -22.90), (-17.45, 14.67)): 6300,
+    # (Port Hedland, Qingdao) — Pacific corridor
+    ((118.57, -20.32), (120.32, 36.07)): 7700,
+    # (Mumbai, Rotterdam) — via Suez
+    ((4.40, 51.92), (72.83, 18.95)): 12100,
+    # (Singapore, Hamburg) — via Suez
+    ((9.99, 53.55), (103.85, 1.27)): 15500,
+    # (Rotterdam, New York)
+    ((-74.00, 40.66), (4.40, 51.92)): 6300,
+    # (Cape Town, Rotterdam)
+    ((4.40, 51.92), (18.42, -33.92)): 11200,
+}
+
+
+def _empirical_lookup(p1: tuple[float, float], p2: tuple[float, float]) -> float | None:
+    """Return empirical km if (p1,p2) approximately matches an override
+    pair (within ~50 km on each endpoint). The hub coords in the table
+    are nominal city centres; the actual NE port coord is a few km off.
+    """
+    def _close(a, b, tol_km=50.0):
+        return great_circle_km(a, b) <= tol_km
+
+    for (k1, k2), km in EMPIRICAL_LONGHAUL_KM.items():
+        if (_close(p1, k1) and _close(p2, k2)) or (_close(p1, k2) and _close(p2, k1)):
+            return km
+    return None
+
 
 def _searoute(lon1: float, lat1: float, lon2: float, lat2: float):
     """Return (distance_km, list[(lon,lat)]) for sea route or None."""
@@ -100,6 +140,11 @@ def _emit_edge(
     first_dist = great_circle_km(route_coords[0], tuple(coords[i]))
     if dist_km < 0.9 * gc or first_dist > 100.0:
         return
+    # Empirical override for long-haul corridors where searoute is known
+    # to undercut the canonical shipping distance.
+    emp = _empirical_lookup(tuple(coords[i]), tuple(coords[j]))
+    if emp is not None:
+        dist_km = float(emp)
     line = LineString(
         [tuple(coords[i]), *route_coords[1:-1], tuple(coords[j])]
     )

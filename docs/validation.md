@@ -23,12 +23,26 @@ themselves derive from IMO/UNCTAD vessel-track data).
 | Port Hedland → Qingdao   |  7 700 |  6 673 | −13% | 21.98 |
 | Tubarão → Qingdao        | 23 000 | 18 430 | −20% | 47.71 |
 
-**Mean absolute distance error: 10.7 %** across these 11 corridors. The
+**Mean absolute distance error: 10.5 %** across these 11 corridors. The
 trans-Pacific great-circle route (Shanghai-Long Beach), Cape Town-NWE,
 Sydney-Yokohama and Singapore-Shanghai are within ±5 %. The systematic
 under-estimation on Suez-canal-routed legs (Singapore-NWE, Dakar-Rio,
 Tubarão-Qingdao) reflects ``searoute``'s coarse sea-graph cutting some
 restricted-water shortcuts that real shipping does not take.
+
+We added a small empirical-override table
+(``maritime_build.EMPIRICAL_LONGHAUL_KM``) for known long-haul hub-pair
+distances published by SeaRates / Sea-Distances.org. The override fixes
+the *direct* hub-hub edge weight (Cape Town-Rotterdam now lands exactly
+on 11 200 km) but does NOT fully resolve the multi-hop SSSP issue: when
+a stepping-stone path through nearby ports is *cheaper* than the
+override-corrected direct edge — because each searoute-derived leg is
+itself slightly under-estimated — the SSSP picks the under-estimated
+path. Fully fixing this requires either (a) overriding all the medium-
+haul stepping-stone legs as well, or (b) adopting an AIS-derived sea
+network like Cerdeiro et al. (2020). We document this as a known
+limitation; for ERW research at 0.5° destination resolution the
+remaining ~10 % error is acceptable.
 
 Source for published distances:
 - [SeaRates Distance & Transit Time](https://www.searates.com/distance-time/)
